@@ -10,6 +10,11 @@ export interface Question {
   category: string;
   tags: string[];
   paragraph?: string;
+  source?: string;
+  sourceDetails?: {
+    url?: string;
+    [key: string]: any;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

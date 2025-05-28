@@ -81,7 +81,7 @@ export const deleteQuizItem = async (id: string) => {
 
 export const deleteQuestionBagItem = async (id: string) => {
   try {
-    const response = await api.delete(`/quiz-items/question-bag/${id}`);
+    const response = await api.delete(`/question-bag-v2/${id}`);
     return response.data;
   } catch (error) {
     console.error('Error deleting question from question bag:', error);
@@ -164,5 +164,48 @@ export const getRandomQuestions = async (count = 20, timeLimit = 30, filters: Pa
       ...filters
     }
   });
+  return response.data;
+};
+
+/**
+ * Get random questions from QuestionBagV2 for a quiz
+ * @param count Number of questions to fetch (default: 20)
+ * @param timeLimit Time limit in minutes (default: 30)
+ * @param filters Optional filters (category, questionType, difficulty)
+ */
+export const getRandomQuestionsV2 = async (count = 20, timeLimit = 30, filters: Partial<QuestionBagFilters> = {}) => {
+  const response = await api.post('/question-bag-v2/random', {
+    count,
+    timeLimit,
+    filters
+  });
+  return response.data;
+};
+
+/**
+ * Get questions from QuestionBagV2 with pagination and filtering
+ * @param filters Optional filters and pagination parameters
+ */
+export const getQuestionBagV2 = async (filters: QuestionBagFilters = {}) => {
+  const response = await api.get('/question-bag-v2', {
+    params: {
+      page: filters.page || 1,
+      limit: filters.limit || 10,
+      category: filters.category,
+      questionType: filters.questionType,
+      difficulty: filters.difficulty,
+      tags: filters.tags?.join(',')
+    }
+  });
+  return response.data;
+};
+
+/**
+ * Update a question in QuestionBagV2
+ * @param id Question ID
+ * @param questionData Updated question data
+ */
+export const updateQuestionBagV2 = async (id: string, questionData: any) => {
+  const response = await api.put(`/question-bag-v2/${id}`, questionData);
   return response.data;
 };

@@ -1,0 +1,73 @@
+/* Common styles for all question cards */
+.rc-question-card,
+.cr-question-card,
+.ds-question-card,
+.ps-question-card {
+  margin-bottom: 2rem;
+}
+
+/* Reading Comprehension specific styles */
+.rc-question-card .passage-column {
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  height: 100%;
+}
+
+/* Mobile tab navigation for RC questions */
+.rc-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.rc-tab {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rc-tab.active {
+  border-bottom: 2px solid #3b82f6;
+  font-weight: 600;
+}
+
+/* Critical Reasoning specific styles */
+.cr-question-card .argument-section {
+  background-color: #f3f4f6;
+  border-left: 4px solid #3b82f6;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+}
+
+/* Data Sufficiency specific styles */
+.ds-question-card .statement {
+  background-color: #eff6ff;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ds-info-box {
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Problem Solving specific styles */
+.ps-question-card .math-expression {
+  margin: 1rem 0;
+}
+
+/* KaTeX styling overrides */
+.katex {
+  font-size: 1.1em;
+}
+
+.katex-display {
+  margin: 1.5rem 0;
+} 

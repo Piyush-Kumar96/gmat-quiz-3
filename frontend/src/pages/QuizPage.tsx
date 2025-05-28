@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getQuiz, submitQuiz, getRandomQuestions } from '../services/api';
+import { getQuiz, submitQuiz, getRandomQuestionsV2 } from '../services/api';
 import { QuizItem, QuizConfig, QuizSubmission } from '../types';
-import { Button, Card, Progress, Space, Modal, Alert, Badge } from 'antd';
+import { Button, Card, Progress, Space, Modal, Alert, Badge, Typography } from 'antd';
 import { 
   ArrowRightOutlined, 
   FlagOutlined, 
@@ -10,6 +10,9 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
+import QuestionCard from '../components/QuestionCard';
+
+const { Text, Title } = Typography;
 
 // Icon components with required TypeScript props
 const ClockIcon = () => (
@@ -76,8 +79,12 @@ export const QuizPage: React.FC = () => {
       try {
         setLoading(true);
         
-        // Use the new function to get random questions from QuestionBag
-        const data = await getRandomQuestions(config.count, config.timeLimit);
+        // Use the V2 function to get random questions from QuestionBagV2
+        const data = await getRandomQuestionsV2(config.count, config.timeLimit, {
+          category: config.category,
+          questionType: config.questionType,
+          difficulty: config.difficulty
+        });
         
         setQuestions(data.questions);
         setTimeLeft(data.timeLimit * 60);
@@ -247,57 +254,65 @@ export const QuizPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header with timer and progress */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
+      {/* Header with timer only */}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">GMAT Quiz</h1>
-          <div className="flex items-center">
+          <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
             <ClockIcon />
-            <span className={`text-lg font-medium ${timeLeft < 300 ? 'text-red-500' : ''}`}>
+            <span className={`text-lg font-medium ${timeLeft < 300 ? 'text-red-500 animate-pulse' : ''}`}>
               {formatTime(timeLeft)}
             </span>
           </div>
         </div>
-        
-        <Progress 
-          percent={calculateProgress()} 
-          status="active" 
-          format={() => `${Object.keys(answers).length}/${questions.length}`}
-        />
-      </div>
 
-      {/* Question navigation */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="text-gray-500">
-          <span>No going back to previous questions</span>
+        {/* Question navigation */}
+        <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100">
+          <div className="text-gray-500 text-sm">
+            <span>No going back to previous questions</span>
+          </div>
+          
+          <div className="text-center font-medium">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </div>
+          
+          <Button 
+            type="primary" 
+            onClick={nextQuestion}
+            disabled={currentQuestionIndex === questions.length - 1}
+            className="flex items-center"
+          >
+            <span className="inline-flex items-center">
+              Next Question <ArrowRightIcon />
+            </span>
+          </Button>
         </div>
-        
-        <div className="text-center">
-          Question {currentQuestionIndex + 1} of {questions.length}
-        </div>
-        
-        <Button 
-          type="primary" 
-          onClick={nextQuestion}
-          disabled={currentQuestionIndex === questions.length - 1}
-        >
-          <span className="inline-flex items-center">
-            Next Question <ArrowRightIcon />
-          </span>
-        </Button>
       </div>
 
       {/* Current question card */}
       {currentQuestion && (
         <Card 
-          className="mb-6 shadow-md" 
-          title={
+          className="shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-lg overflow-hidden mb-8"
+          bodyStyle={{ padding: 0 }}
+        >
+          {/* Question Header with metadata */}
+          <div className="bg-gray-50 border-b border-gray-200 p-4">
             <div className="flex justify-between items-center">
-              <span>Question {currentQuestionIndex + 1}</span>
+              <div className="flex-1">
+                <div className="flex flex-wrap gap-2">
+                  {currentQuestion.type && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                      {currentQuestion.type}
+                    </span>
+                  )}
+                </div>
+              </div>
               <Button 
                 type={isCurrentQuestionFlagged ? "primary" : "default"}
                 onClick={toggleFlag}
                 disabled={!isCurrentQuestionFlagged && flaggedQuestions.length >= 3}
+                danger={isCurrentQuestionFlagged}
+                className="ml-2"
               >
                 <span className="inline-flex items-center">
                   <FlagIcon />
@@ -305,43 +320,26 @@ export const QuizPage: React.FC = () => {
                 </span>
               </Button>
             </div>
-          }
-        >
-          <div className="mb-4">
-            <p className="text-lg">{currentQuestion.questionText}</p>
           </div>
           
-          <div className="space-y-3">
-            {currentQuestion.options?.map((option, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                  currentAnswer === option
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                }`}
-                onClick={() => handleAnswerSelect(option)}
-              >
-                <div className="flex items-center">
-                  <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-3 ${
-                    currentAnswer === option
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}>
-                    {String.fromCharCode(65 + index)}
-                  </div>
-                  <div>{option}</div>
-                </div>
-              </div>
-            ))}
+          {/* Question Content */}
+          <div className="p-5">
+            <QuestionCard
+              question={currentQuestion as any}
+              selectedOption={currentAnswer}
+              onChange={handleAnswerSelect}
+            />
           </div>
 
-          <div className="mt-6 flex justify-between">
+          {/* Footer with navigation */}
+          <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100 p-4 bg-gray-50">
             {!isLastQuestion ? (
               <Button 
                 type="primary"
                 onClick={nextQuestion}
                 disabled={!currentAnswer}
+                size="large"
+                className="flex items-center"
               >
                 <span className="inline-flex items-center">
                   Next Question <ArrowRightIcon />
@@ -351,6 +349,8 @@ export const QuizPage: React.FC = () => {
               <Button 
                 type="primary"
                 onClick={handleSubmit}
+                size="large"
+                className="flex items-center"
               >
                 <span className="inline-flex items-center">
                   Submit Quiz <CheckIcon />
@@ -362,38 +362,70 @@ export const QuizPage: React.FC = () => {
       )}
 
       {/* Progress indicators */}
-      <div className="grid grid-cols-10 gap-2 mb-6">
-        {questions.map((question, index) => {
-          const isAnswered = answers[question._id] !== undefined;
-          const isFlagged = flaggedQuestions.includes(question._id);
-          const isVisited = visitedQuestions.includes(index);
-          const isCurrent = currentQuestionIndex === index;
-          
-          return (
-            <div
-              key={index}
-              className={`h-2 rounded-full ${
-                isCurrent 
-                  ? 'bg-blue-500' 
-                  : isAnswered 
-                    ? 'bg-green-500' 
-                    : isVisited 
-                      ? 'bg-yellow-500' 
-                      : 'bg-gray-300'
-              } ${isFlagged ? 'border-2 border-red-500' : ''}`}
-            />
-          );
-        })}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <div className="mb-2 font-medium">Question Status</div>
+        <div className="grid grid-cols-10 gap-2 mb-4">
+          {questions.map((question, index) => {
+            const isAnswered = answers[question._id] !== undefined;
+            const isFlagged = flaggedQuestions.includes(question._id);
+            const isVisited = visitedQuestions.includes(index);
+            const isCurrent = currentQuestionIndex === index;
+            
+            return (
+              <div
+                key={index}
+                className={`h-8 rounded flex items-center justify-center text-xs font-bold ${
+                  isCurrent 
+                    ? 'bg-blue-500 text-white' 
+                    : isAnswered 
+                      ? 'bg-green-500 text-white' 
+                      : isVisited 
+                        ? 'bg-yellow-500 text-white' 
+                        : 'bg-gray-200 text-gray-700'
+                } ${isFlagged ? 'ring-2 ring-red-500' : ''}`}
+              >
+                {index + 1}
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+            <span>Current</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+            <span>Answered</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+            <span>Visited</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gray-200 rounded mr-2"></div>
+            <span>Not Visited</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gray-300 rounded mr-2 ring-2 ring-red-500"></div>
+            <span>Flagged</span>
+          </div>
+        </div>
       </div>
 
       {/* Submit button */}
-      <div className="text-center mt-8">
+      <div className="bg-white shadow-md rounded-lg p-6 text-center">
+        <p className="mb-4 text-gray-600">
+          Ready to submit? You have answered {Object.keys(answers).length} out of {questions.length} questions.
+        </p>
         <Button
           type="primary"
           size="large"
           onClick={handleSubmit}
           loading={isSubmitting}
           disabled={isSubmitting}
+          className="px-8"
         >
           <span className="inline-flex items-center">
             Submit Quiz <CheckIcon />
@@ -403,7 +435,16 @@ export const QuizPage: React.FC = () => {
 
       {/* Time warning modal */}
       <Modal
-        title="Time Warning"
+        title={
+          <div className="flex items-center text-red-600">
+            <ClockCircleOutlined 
+              className="mr-2"
+              onPointerEnterCapture={() => {}}
+              onPointerLeaveCapture={() => {}}
+            />
+            <span>Time Warning</span>
+          </div>
+        }
         open={showTimeWarning}
         onOk={() => setShowTimeWarning(false)}
         cancelButtonProps={{ style: { display: 'none' } }}

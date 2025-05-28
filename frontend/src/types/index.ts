@@ -12,6 +12,9 @@ export interface QuizItem {
 export interface QuizConfig {
   count: number;
   timeLimit: number;
+  category?: string;
+  questionType?: string;
+  difficulty?: number;
 }
 
 export interface QuizResult {

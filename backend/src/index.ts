@@ -7,6 +7,7 @@ import quizRoutes from './routes/quizRoutes';
 import quizItemRoutes from './routes/quizItemRoutes';
 import authRoutes from './routes/authRoutes';
 import fileRoutes from './routes/fileRoutes';
+import questionBagV2Routes from './routes/questionBagV2Routes';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api', quizRoutes);
 app.use('/api/quiz-items', quizItemRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/question-bag-v2', questionBagV2Routes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/gmat-quiz')
