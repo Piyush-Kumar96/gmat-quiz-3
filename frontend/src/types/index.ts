@@ -23,6 +23,14 @@ export interface QuizResult {
   isCorrect: boolean;
   correctAnswer?: string;
   explanation?: string;
+  
+  // Additional fields for enhanced results display
+  questionType?: string;
+  questionText?: string;
+  userAnswerText?: string;
+  correctAnswerText?: string;
+  passageText?: string;
+  difficulty?: string;
 }
 
 export interface QuizSubmission {
@@ -32,4 +40,9 @@ export interface QuizSubmission {
   percentage: number;
   results: QuizResult[];
   userQuizId?: string;
+  
+  // Additional fields for enhanced results display
+  timeSpent?: number;
+  startTime?: Date;
+  endTime?: Date;
 } 

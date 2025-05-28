@@ -96,8 +96,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       <div className="space-y-3">
         {question.options.map((option: string, index: number) => {
           const optionLetter = String.fromCharCode(65 + index);
-          const isSelected = selectedOption === option;
-          const isCorrect = showAnswer && correctAnswer === option;
+          const isSelected = selectedOption === optionLetter;
+          const isCorrect = showAnswer && correctAnswer === optionLetter;
           
           return (
             <div 
@@ -107,7 +107,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                   ? 'bg-blue-100 border-2 border-blue-500 shadow-md transform scale-[1.01]' 
                   : 'bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-blue-300'
               } ${isCorrect ? 'ring-2 ring-green-500' : ''}`}
-              onClick={() => handleOptionSelect(option)}
+              onClick={() => handleOptionSelect(optionLetter)}
             >
               <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full mr-3 font-medium shadow ${
                 isSelected 

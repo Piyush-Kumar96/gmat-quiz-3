@@ -1,25 +1,29 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QuizSubmission } from '../types';
-import { Card, Button, Tag, Divider, Typography } from 'antd';
+import { Card, Button, Tag, Divider, Typography, Collapse } from 'antd';
+import QuestionCard from '../components/QuestionCard';
 
 const { Title, Text, Paragraph } = Typography;
+const { Panel } = Collapse;
 
 export const ResultsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const submission = location.state?.submission as QuizSubmission;
 
-  // Count question types
+  // Count question types with better detection
   const getQuestionTypeCounts = () => {
     if (!submission?.results) return {};
     
     const typeCounts: Record<string, { total: number, correct: number }> = {};
     
     submission.results.forEach(result => {
-      // Try to extract question type from the explanation if available
-      let type = 'Unknown';
-      if (result.explanation) {
+      // Try to extract question type from result metadata if available
+      let type = result.questionType || 'Unknown';
+      
+      // Fall back to extraction from explanation if no explicit type
+      if (type === 'Unknown' && result.explanation) {
         // Look for common pattern like "This is a [Critical Reasoning] question"
         const match = result.explanation.match(/This is an? ([^.]+) question/i) || 
                      result.explanation.match(/This ([^.]+) question/i);
@@ -56,30 +60,41 @@ export const ResultsPage: React.FC = () => {
   }
 
   const questionTypes = getQuestionTypeCounts();
+  const timeSpent = submission.timeSpent || 0;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Card className="mb-8 text-center">
+      {/* Results Summary Card */}
+      <Card className="mb-8 text-center shadow-md rounded-lg">
         <Title level={2}>Quiz Results</Title>
-        <div className="text-5xl font-bold text-blue-600 mb-2">
+        <div className="text-5xl font-bold mb-2" style={{ color: submission.percentage >= 70 ? '#10b981' : submission.percentage >= 50 ? '#f59e0b' : '#ef4444' }}>
           {submission.percentage.toFixed(1)}%
         </div>
         <Text className="text-lg">
           You got <strong>{submission.score}</strong> out of <strong>{submission.total}</strong> questions correct
         </Text>
+        
+        <div className="mt-4 px-4 py-2 bg-gray-100 rounded-md inline-block">
+          <Text className="text-sm text-gray-600">
+            Time spent: <strong>{Math.floor(timeSpent / 60)}</strong>m <strong>{timeSpent % 60}</strong>s
+          </Text>
+        </div>
       </Card>
 
       {/* Question type statistics */}
-      <Card className="mb-8" title="Performance by Question Type">
+      <Card className="mb-8 shadow-md rounded-lg" title={<Title level={4}>Performance by Question Type</Title>}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(questionTypes).map(([type, stats]) => (
-            <div key={type} className="flex justify-between items-center p-3 border rounded">
+            <div key={type} className="flex justify-between items-center p-3 border rounded hover:shadow-sm transition-shadow">
               <Text strong>{type}</Text>
-              <div>
+              <div className="flex gap-2">
                 <Tag color={stats.correct === stats.total ? "success" : "warning"}>
                   {stats.correct}/{stats.total} correct
                 </Tag>
-                <Tag color="blue">
+                <Tag color={
+                  (stats.correct / stats.total) * 100 >= 70 ? "green" :
+                  (stats.correct / stats.total) * 100 >= 50 ? "orange" : "red"
+                }>
                   {((stats.correct / stats.total) * 100).toFixed(0)}%
                 </Tag>
               </div>
@@ -94,39 +109,86 @@ export const ResultsPage: React.FC = () => {
         {submission.results.map((result, index) => (
           <Card 
             key={result.questionId}
-            className={`${result.isCorrect ? 'border-green-500' : 'border-red-500'} border-t-4`}
-            title={
+            className={`shadow-md hover:shadow-lg transition-shadow border-t-4 ${
+              result.isCorrect ? 'border-t-green-500' : 'border-t-red-500'
+            }`}
+            bodyStyle={{ padding: 0 }}
+          >
+            {/* Question Header */}
+            <div className="bg-gray-50 border-b border-gray-200 p-4">
               <div className="flex justify-between items-center">
-                <span>Question {index + 1}</span>
-                <Tag color={result.isCorrect ? "success" : "error"}>
+                <div className="flex items-center">
+                  <span className="font-medium mr-2">Question {index + 1}</span>
+                  {result.questionType && (
+                    <Tag color="blue" className="mr-2">{result.questionType}</Tag>
+                  )}
+                </div>
+                <Tag color={result.isCorrect ? "success" : "error"} className="px-3 py-1">
                   {result.isCorrect ? 'Correct' : 'Incorrect'}
                 </Tag>
               </div>
-            }
-          >
-            <div className="mb-4">
-              <div className="flex flex-col md:flex-row md:justify-between mb-2">
-                <div className="mb-2 md:mb-0">
-                  <Text strong>Your answer: </Text>
-                  <Tag color={result.isCorrect ? "success" : "default"}>
-                    {result.userAnswer}
-                  </Tag>
+            </div>
+            
+            {/* Question Content */}
+            <div className="p-5">
+              {/* Show original question if available */}
+              {result.questionText && (
+                <div className="mb-4">
+                  <Text strong className="block mb-2">Question:</Text>
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <Text>{result.questionText}</Text>
+                  </div>
+                </div>
+              )}
+              
+              {/* Answer comparison */}
+              <div className="flex flex-col md:flex-row md:justify-between gap-4 mb-4">
+                <div className="flex-1">
+                  <Text strong className="block mb-2">Your answer:</Text>
+                  <div className={`p-3 rounded-md ${result.isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center">
+                      <div className={`w-7 h-7 flex items-center justify-center rounded-full mr-3 ${
+                        result.isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
+                        {result.userAnswer}
+                      </div>
+                      <Text>{result.userAnswerText || ''}</Text>
+                    </div>
+                  </div>
                 </div>
                 
                 {!result.isCorrect && (
-                  <div>
-                    <Text strong>Correct answer: </Text>
-                    <Tag color="success">{result.correctAnswer}</Tag>
+                  <div className="flex-1">
+                    <Text strong className="block mb-2">Correct answer:</Text>
+                    <div className="p-3 rounded-md bg-green-50 border border-green-200">
+                      <div className="flex items-center">
+                        <div className="w-7 h-7 flex items-center justify-center rounded-full bg-green-500 text-white mr-3">
+                          {result.correctAnswer}
+                        </div>
+                        <Text>{result.correctAnswerText || ''}</Text>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
               
-              <Divider className="my-3" />
-              
+              {/* Explanation */}
               {result.explanation && (
                 <div>
-                  <Text strong>Explanation:</Text>
-                  <Paragraph className="mt-1">{result.explanation}</Paragraph>
+                  <Collapse 
+                    ghost 
+                    defaultActiveKey={result.isCorrect ? [] : ['1']}
+                  >
+                    <Panel 
+                      header={<Text strong>Explanation</Text>} 
+                      key="1"
+                      className="bg-yellow-50 border border-yellow-200 rounded-md"
+                    >
+                      <div className="px-3 py-2">
+                        <Text>{result.explanation}</Text>
+                      </div>
+                    </Panel>
+                  </Collapse>
                 </div>
               )}
             </div>

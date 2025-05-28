@@ -45,32 +45,38 @@ export const CRQuestionCard: React.FC<CRQuestionCardProps> = ({
 
       {/* Options Section */}
       <div className="space-y-3">
-        {question.options.map((option, index) => (
-          <div
-            key={index}
-            className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-              selectedAnswer === option
-                ? 'border-2 border-blue-500 bg-blue-100 shadow-md transform scale-[1.01]'
-                : showAnswer && option === correctAnswer
-                ? 'border-2 border-green-500 bg-green-50'
-                : 'border border-gray-200 hover:border-blue-300 hover:bg-gray-100'
-            }`}
-            onClick={() => onAnswerSelect && onAnswerSelect(option)}
-          >
-            <div className="flex items-start">
-              <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-3 shadow ${
-                selectedAnswer === option
-                  ? 'bg-blue-600 text-white'
-                  : showAnswer && option === correctAnswer
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}>
-                {String.fromCharCode(65 + index)}
+        {question.options.map((option, index) => {
+          const optionLetter = String.fromCharCode(65 + index);
+          const isSelected = selectedAnswer === optionLetter;
+          const isCorrect = showAnswer && correctAnswer === optionLetter;
+          
+          return (
+            <div
+              key={index}
+              className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                isSelected
+                  ? 'border-2 border-blue-500 bg-blue-100 shadow-md transform scale-[1.01]'
+                  : isCorrect
+                  ? 'border-2 border-green-500 bg-green-50'
+                  : 'border border-gray-200 hover:border-blue-300 hover:bg-gray-100'
+              }`}
+              onClick={() => onAnswerSelect && onAnswerSelect(optionLetter)}
+            >
+              <div className="flex items-start">
+                <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-3 shadow ${
+                  isSelected
+                    ? 'bg-blue-600 text-white'
+                    : isCorrect
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {optionLetter}
+                </div>
+                <div className={isSelected ? 'font-medium text-blue-800' : ''}>{option}</div>
               </div>
-              <div className={selectedAnswer === option ? 'font-medium text-blue-800' : ''}>{option}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Explanation Section */}

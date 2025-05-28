@@ -327,7 +327,7 @@ export const QuizPage: React.FC = () => {
             <QuestionCard
               question={currentQuestion as any}
               selectedOption={currentAnswer}
-              onChange={handleAnswerSelect}
+              onChange={(questionId, option) => handleAnswerSelect(option)}
             />
           </div>
 

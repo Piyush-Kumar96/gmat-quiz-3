@@ -71,12 +71,26 @@ router.post('/random', async (req, res) => {
     if (filters.questionType) filter.questionType = filters.questionType;
     if (filters.difficulty) filter.difficulty = filters.difficulty;
     
+    // Add sanity checks to filter out incomplete questions
+    const validQuestionFilter = {
+      questionText: { $exists: true, $ne: '' },  // Must have question text
+      options: { $exists: true, $ne: {} },       // Must have options
+      correctAnswer: { $exists: true, $ne: '' }  // Must have correct answer
+    };
+    
     // Final array to hold our quiz questions
     let finalQuestions = [];
     
     // Step 1: First, get all Reading Comprehension passages with at least 3 questions
     const rcGroups = await QuestionBagV2.aggregate([
-      { $match: { questionType: 'Reading Comprehension', rcNumber: { $exists: true, $ne: null } } },
+      { 
+        $match: { 
+          questionType: 'Reading Comprehension', 
+          rcNumber: { $exists: true, $ne: null },
+          passageText: { $exists: true, $ne: '' }, // Must have passage text
+          ...validQuestionFilter // Include common validity checks
+        } 
+      },
       { $group: { _id: '$rcNumber', count: { $sum: 1 }, questions: { $push: '$$ROOT' } } },
       { $match: { count: { $gte: 3 } } }, // Only passages with at least 3 questions
       { $sample: { size: Math.ceil(count / 4) } } // Select a few RC passages randomly
@@ -90,15 +104,28 @@ router.post('/random', async (req, res) => {
       // If we already have enough questions, break
       if (finalQuestions.length + 3 > count) break;
       
+      // Filter out incomplete questions from this passage group
+      const validQuestions = group.questions.filter((q: any) => 
+        q.questionText && 
+        q.options && 
+        Object.keys(q.options).length > 0 && 
+        q.correctAnswer
+      );
+      
+      if (validQuestions.length < 3) {
+        console.log(`Skipping RC passage ${group._id} - insufficient valid questions`);
+        continue; // Skip this passage if it doesn't have enough valid questions
+      }
+      
       // Take 3-5 questions from this passage
       const questionsToTake = Math.min(
         Math.floor(Math.random() * 3) + 3, // Random number between 3-5
-        group.questions.length, // Don't exceed available questions
+        validQuestions.length, // Don't exceed available valid questions
         5 // Maximum 5 questions per passage
       );
       
       // Sort by question number if available
-      const sortedQuestions = group.questions
+      const sortedQuestions = validQuestions
         .sort((a: any, b: any) => (a.questionNumber || 0) - (b.questionNumber || 0))
         .slice(0, questionsToTake);
       
@@ -118,11 +145,25 @@ router.post('/random', async (req, res) => {
       
       const nonRcFilter = {
         ...filter,
+        ...validQuestionFilter, // Include validity checks for non-RC questions
         $or: [
           { questionType: { $ne: 'Reading Comprehension' } },
           { rcNumber: { $nin: rcNumbers } }
         ]
       };
+      
+      // For Critical Reasoning questions, ensure they have a passageText (argument)
+      if (filters.questionType === 'Critical Reasoning') {
+        nonRcFilter.passageText = { $exists: true, $ne: '' };
+      }
+      
+      // For Data Sufficiency questions, ensure they have statement1 and statement2 or can be parsed
+      if (filters.questionType === 'Data Sufficiency') {
+        nonRcFilter.$or = [
+          { 'metadata.statement1': { $exists: true, $ne: '' }, 'metadata.statement2': { $exists: true, $ne: '' } },
+          { questionText: { $regex: /\(1\).*\(2\)/ } } // Has statements that can be parsed
+        ];
+      }
       
       const remainingQuestions = await QuestionBagV2.aggregate([
         { $match: nonRcFilter },

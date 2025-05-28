@@ -3,6 +3,7 @@ import { PDFImporter } from '../pdfImporter';
 import { QuizItem } from '../models/QuizItem';
 import { UserQuiz } from '../models/UserQuiz';
 import { QuestionBag } from '../models/QuestionBag';
+import { QuestionBagV2 } from '../models/QuestionBagV2';
 import mongoose from 'mongoose';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/authMiddleware';
 
@@ -89,7 +90,7 @@ router.get('/quizzes', optionalAuthMiddleware, async (req: any, res) => {
   }
 });
 
-// Submit quiz answers (new endpoint for QuestionBag quizzes)
+// Submit quiz answers (updated to handle QuestionBagV2)
 router.post('/quizzes/submit', optionalAuthMiddleware, async (req: any, res) => {
   try {
     const { quizId, answers, timeSpent } = req.body;
@@ -101,42 +102,89 @@ router.post('/quizzes/submit', optionalAuthMiddleware, async (req: any, res) => 
     const results: QuizResult[] = [];
     const questionTypes = new Map();
     
-    // Process each answer - try QuestionBag first, then fall back to QuizItem
+    // Process each answer - try QuestionBagV2 first, then QuestionBag, then fall back to QuizItem
     for (const [questionId, answer] of Object.entries(answers)) {
-      let question;
+      let question = null;
+      let correctAnswerValue = null;
+      let explanation = null;
+      let questionType = 'Unknown';
       
-      // First try to find in QuestionBag
+      // First try to find in QuestionBagV2 (newest format)
       if (mongoose.Types.ObjectId.isValid(questionId)) {
-        question = await QuestionBag.findById(questionId);
+        question = await QuestionBagV2.findById(questionId);
+        
+        if (question) {
+          correctAnswerValue = question.correctAnswer;
+          explanation = question.explanation || '';
+          questionType = question.questionType || 'Unknown';
+        }
       }
       
-      // If not found in QuestionBag, try QuizItem
+      // If not found in QuestionBagV2, try QuestionBag
+      if (!question && mongoose.Types.ObjectId.isValid(questionId)) {
+        question = await QuestionBag.findById(questionId);
+        
+        if (question) {
+          correctAnswerValue = question.correctAnswer;
+          explanation = question.explanation || '';
+          questionType = question.questionType || 'Unknown';
+        }
+      }
+      
+      // If not found in QuestionBag, try QuizItem (oldest format)
       if (!question && mongoose.Types.ObjectId.isValid(questionId)) {
         question = await QuizItem.findById(questionId);
+        
+        if (question) {
+          correctAnswerValue = question.answerText;
+          explanation = question.explanationText || question.AI_generated_explanation || '';
+          questionType = question.type || 'Unknown';
+        }
       }
       
       if (!question) continue;
-
-      // Use correctAnswer or fall back to answerText
-      const correctAnswerValue = question.correctAnswer || question.answerText;
-      const isCorrect = correctAnswerValue?.toLowerCase() === (answer as string).toLowerCase();
+      
+      // Handle different answer formats (letter vs full text)
+      let isCorrect = false;
+      const userAnswer = answer as string;
+      
+      if (correctAnswerValue) {
+        // For QuestionBagV2, the correct answer might be a letter (A, B, C, etc.)
+        // or it might be the full text of the answer
+        isCorrect = userAnswer === correctAnswerValue;
+        
+        // If not exact match, try to handle the case where answer is a letter but correctAnswer is full text
+        if (!isCorrect && question.options) {
+          // For QuestionBagV2, options could be an array or an object
+          if (Array.isArray(question.options)) {
+            // If options is an array, try to match by index (A=0, B=1, etc.)
+            const letterIndex = userAnswer.charCodeAt(0) - 65; // 'A' = 0, 'B' = 1, etc.
+            if (letterIndex >= 0 && letterIndex < question.options.length) {
+              isCorrect = question.options[letterIndex] === correctAnswerValue;
+            }
+          } else if (typeof question.options === 'object') {
+            // If options is an object, check if the answer matches the letter key
+            isCorrect = question.options[userAnswer] === correctAnswerValue || 
+                       (userAnswer === correctAnswerValue);
+          }
+        }
+      }
       
       // Track question type statistics
-      const type = question.questionType || question.type || 'Unknown';
-      if (!questionTypes.has(type)) {
-        questionTypes.set(type, { type, total: 0, correct: 0 });
+      if (!questionTypes.has(questionType)) {
+        questionTypes.set(questionType, { type: questionType, total: 0, correct: 0 });
       }
-      const typeStats = questionTypes.get(type);
+      const typeStats = questionTypes.get(questionType);
       typeStats.total += 1;
       if (isCorrect) typeStats.correct += 1;
       
       // Add to results
       results.push({
         questionId,
-        userAnswer: answer as string,
+        userAnswer: userAnswer,
         isCorrect,
         correctAnswer: correctAnswerValue,
-        explanation: question.explanation || question.explanationText || question.AI_generated_explanation || ''
+        explanation: explanation
       });
     }
 
