@@ -38,13 +38,6 @@ const userSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     trim: true,
-    validate: {
-      validator: function(v: string) {
-        // Basic phone number validation (can be customized based on requirements)
-        return !v || /^\+?[\d\s-]{10,}$/.test(v);
-      },
-      message: (props: any) => `${props.value} is not a valid phone number!`
-    }
   },
   createdAt: {
     type: Date,
@@ -54,6 +47,7 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
+  // Only hash the password if it's modified (or new)
   if (!this.isModified('password')) return next();
   
   try {
@@ -65,9 +59,32 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Compare password method
+// Custom hook to hash password on findOneAndUpdate
+userSchema.pre('findOneAndUpdate', async function(next) {
+  const update: any = this.getUpdate();
+  
+  // Only proceed if password field is being updated
+  if (update && update.$set && update.$set.password) {
+    try {
+      const salt = await bcrypt.genSalt(10);
+      update.$set.password = await bcrypt.hash(update.$set.password, salt);
+      next();
+    } catch (error: any) {
+      next(error);
+    }
+  } else {
+    next();
+  }
+});
+
+// Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    console.error('Password comparison error:', error);
+    return false;
+  }
 };
 
 export const User = mongoose.model<IUser>('User', userSchema); 

@@ -96,6 +96,11 @@ interface QuestionBagFilters {
   questionType?: string;
   difficulty?: number;
   tags?: string[];
+  
+  // Add multi-select filter fields
+  categories?: string[];
+  questionTypes?: string[];
+  difficulties?: number[];
 }
 
 export const getQuestionBag = async (filters: QuestionBagFilters = {}) => {
@@ -208,4 +213,33 @@ export const getQuestionBagV2 = async (filters: QuestionBagFilters = {}) => {
 export const updateQuestionBagV2 = async (id: string, questionData: any) => {
   const response = await api.put(`/question-bag-v2/${id}`, questionData);
   return response.data;
+};
+
+/**
+ * Get available question types
+ * Note: Currently returns hardcoded values, should be replaced with API call when available
+ */
+export const getQuestionTypes = async () => {
+  // In a real implementation, this would be an API call
+  // For now, return common GMAT Focus Edition question types
+  return [
+    'Reading Comprehension',
+    'Critical Reasoning',
+    'Data Sufficiency',
+    'Problem Solving'
+  ];
+};
+
+/**
+ * Get available categories
+ * Note: Currently returns hardcoded values, should be replaced with API call when available
+ */
+export const getCategories = async () => {
+  // In a real implementation, this would be an API call
+  // For now, return GMAT Focus Edition categories
+  return [
+    'Quantitative Reasoning',
+    'Verbal Reasoning',
+    'Data Insights'
+  ];
 };

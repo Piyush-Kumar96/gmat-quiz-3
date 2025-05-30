@@ -1,84 +1,118 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// Get JWT secret from env or use default for development
+const JWT_SECRET = process.env.JWT_SECRET || 'gmat-quiz-jwt-secret-key-dev';
 
-// Define the JWT payload interface
-interface JwtPayload {
-  userId: string;
+// Warn if using default secret in production
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: Using default JWT secret. This is insecure for production!');
 }
 
-// Define a custom request interface that includes the user property
+// JWT payload interface
+interface JwtPayload {
+  userId: string;
+  email: string;
+}
+
+// Extended request interface with user data
 export interface AuthRequest extends Request {
   user?: {
-    _id: string;
     userId: string;
+    email: string;
   };
 }
 
-// Type for Express request handler that accepts AuthRequest
-export type AuthRequestHandler = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => void | Promise<void> | Response;
-
-// Middleware that requires authentication
+/**
+ * Authentication middleware - verifies JWT token and adds user to request
+ */
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Get token from header
+    // Get token from Authorization header
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ message: 'Authorization token required' });
-      return;
+      return res.status(401).json({ 
+        success: false,
+        message: 'No authentication token provided' 
+      });
     }
     
     const token = authHeader.split(' ')[1];
     
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid authentication token format' 
+      });
+    }
+    
     // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    
-    // Add user info to request
-    req.user = {
-      _id: decoded.userId,
-      userId: decoded.userId
-    };
-    
-    next();
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      
+      // Add user info to request
+      req.user = {
+        userId: decoded.userId,
+        email: decoded.email
+      };
+      
+      next();
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ 
+          success: false,
+          message: 'Token expired',
+          expired: true
+        });
+      }
+      
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid authentication token'
+      });
+    }
   } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(401).json({ message: 'Not authorized, invalid token' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Authentication error' 
+    });
   }
 };
 
-// Middleware that makes authentication optional
+/**
+ * Optional authentication middleware - checks token if present but doesn't require it
+ */
 export const optionalAuthMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Get token from header
     const authHeader = req.headers.authorization;
     
-    // If no token, continue without setting user
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      next();
-      return;
+      return next();
     }
     
     const token = authHeader.split(' ')[1];
     
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (!token) {
+      return next();
+    }
     
-    // Add user info to request
-    req.user = {
-      _id: decoded.userId,
-      userId: decoded.userId
-    };
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      
+      req.user = {
+        userId: decoded.userId,
+        email: decoded.email
+      };
+    } catch (error) {
+      // Continue without setting user if token is invalid
+    }
     
     next();
   } catch (error) {
-    // If token is invalid, continue without setting user
-    // This makes authentication optional
+    // Continue without setting user if any error occurs
+    console.error('Optional auth middleware error:', error);
     next();
   }
 };

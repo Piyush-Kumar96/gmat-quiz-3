@@ -66,11 +66,30 @@ export const QuizPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [quizId, setQuizId] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [questionTimeSpent, setQuestionTimeSpent] = useState<Record<number, number>>({});
+  const [currentQuestionTimer, setCurrentQuestionTimer] = useState(0);
+
+  // Check if accessed directly (no config in location state)
+  useEffect(() => {
+    if (!location.state?.config) {
+      // Redirect to config page if accessed directly
+      navigate('/config', { 
+        state: { 
+          message: 'Please customize your quiz before starting.'
+        }
+      });
+      return;
+    }
+  }, [location.state, navigate]);
 
   // Get config from location state or use default
   const config: QuizConfig = location.state?.config || {
     count: 20,
-    timeLimit: 30
+    timeLimit: 30,
+    questionTypeMode: 'all',
+    difficultyMode: 'all',
+    categoryMode: 'all'
   };
 
   // Load quiz questions
@@ -79,29 +98,99 @@ export const QuizPage: React.FC = () => {
       try {
         setLoading(true);
         
+        // Create the filters object based on the configuration
+        const filters: any = {};
+        
+        // Handle category selection (single or multiple)
+        if (config.categoryMode === 'specific') {
+          if (config.selectedCategories && config.selectedCategories.length > 0) {
+            filters.categories = config.selectedCategories;
+          } else if (config.category) {
+            filters.category = config.category;
+          }
+        }
+        
+        // Handle question type selection (single or multiple)
+        if (config.questionTypeMode === 'specific') {
+          if (config.selectedQuestionTypes && config.selectedQuestionTypes.length > 0) {
+            filters.questionTypes = config.selectedQuestionTypes;
+          } else if (config.questionType) {
+            filters.questionType = config.questionType;
+          }
+        }
+        
+        // Handle difficulty selection (single or multiple)
+        if (config.difficultyMode === 'specific') {
+          if (config.selectedDifficulties && config.selectedDifficulties.length > 0) {
+            // Convert string difficulties to numbers if needed
+            filters.difficulties = config.selectedDifficulties.map(diff => {
+              if (diff === 'easy') return 1;
+              if (diff === 'medium') return 2;
+              if (diff === 'hard') return 3;
+              return parseInt(diff, 10);
+            });
+          } else if (config.difficulty) {
+            // Convert string difficulty to number if needed
+            if (typeof config.difficulty === 'string') {
+              if (config.difficulty === 'easy') filters.difficulty = 1;
+              else if (config.difficulty === 'medium') filters.difficulty = 2;
+              else if (config.difficulty === 'hard') filters.difficulty = 3;
+              else filters.difficulty = parseInt(config.difficulty, 10);
+            } else {
+              filters.difficulty = config.difficulty;
+            }
+          }
+        }
+        
+        console.log('Quiz configuration:', config);
+        console.log('Using filters:', filters);
+        
+        // Set a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          if (loading) {
+            setLoading(false);
+            setError('Request timed out. Please try again or check your connection.');
+          }
+        }, 30000); // 30 second timeout
+        
         // Use the V2 function to get random questions from QuestionBagV2
-        const data = await getRandomQuestionsV2(config.count, config.timeLimit, {
-          category: config.category,
-          questionType: config.questionType,
-          difficulty: config.difficulty
-        });
+        const data = await getRandomQuestionsV2(config.count, config.timeLimit, filters);
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
         
         setQuestions(data.questions);
         setTimeLeft(data.timeLimit * 60);
         setQuizId(data.quizId);
         setLoading(false);
       } catch (err) {
+        console.error('Error loading quiz:', err);
         setError('Failed to load quiz questions. Please try again later.');
         setLoading(false);
       }
     };
 
     loadQuiz();
-  }, []);
+  }, [config]);
+
+  // Per-question timer effect
+  useEffect(() => {
+    if (!isPaused && questions.length > 0) {
+      const timer = setInterval(() => {
+        setCurrentQuestionTimer(prev => prev + 1);
+        setQuestionTimeSpent(prev => ({
+          ...prev,
+          [currentQuestionIndex]: (prev[currentQuestionIndex] || 0) + 1
+        }));
+      }, 1000);
+      
+      return () => clearInterval(timer);
+    }
+  }, [currentQuestionIndex, isPaused, questions.length]);
 
   // Timer effect
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (timeLeft > 0 && !isPaused) {
       const timer = setInterval(() => {
         setTimeLeft(prev => {
           // Show warning when 5 minutes left
@@ -118,7 +207,12 @@ export const QuizPage: React.FC = () => {
     } else if (timeLeft === 0 && questions.length > 0) {
       handleSubmit();
     }
-  }, [timeLeft, questions.length]);
+  }, [timeLeft, questions.length, isPaused]);
+
+  // Reset question timer when moving to a new question
+  useEffect(() => {
+    setCurrentQuestionTimer(questionTimeSpent[currentQuestionIndex] || 0);
+  }, [currentQuestionIndex, questionTimeSpent]);
 
   // Format time as mm:ss
   const formatTime = (seconds: number): string => {
@@ -164,6 +258,11 @@ export const QuizPage: React.FC = () => {
     }
   };
 
+  // Toggle pause state
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
+
   // Calculate progress percentage
   const calculateProgress = (): number => {
     const answeredCount = Object.keys(answers).length;
@@ -179,6 +278,11 @@ export const QuizPage: React.FC = () => {
   const handleSubmit = async () => {
     if (!quizId) {
       setError('Quiz ID is missing. Please restart the quiz.');
+      return;
+    }
+
+    // Don't allow multiple submission attempts
+    if (isSubmitting) {
       return;
     }
 
@@ -254,15 +358,35 @@ export const QuizPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header with timer only */}
+      {/* Header with timer and pause button */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">GMAT Quiz</h1>
-          <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
-            <ClockIcon />
-            <span className={`text-lg font-medium ${timeLeft < 300 ? 'text-red-500 animate-pulse' : ''}`}>
-              {formatTime(timeLeft)}
-            </span>
+          <div className="flex items-center gap-4">
+            {/* Per-question timer */}
+            <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
+              <span className="mr-2">This question:</span>
+              <span className="text-lg font-medium">
+                {formatTime(currentQuestionTimer)}
+              </span>
+            </div>
+            
+            {/* Total timer */}
+            <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
+              <ClockIcon />
+              <span className={`text-lg font-medium ${timeLeft < 300 ? 'text-red-500 animate-pulse' : ''}`}>
+                {formatTime(timeLeft)}
+              </span>
+            </div>
+            
+            {/* Pause button */}
+            <Button
+              type="primary"
+              onClick={togglePause}
+              className="flex items-center"
+            >
+              {isPaused ? 'Resume' : 'Pause'}
+            </Button>
           </div>
         </div>
 
@@ -289,8 +413,25 @@ export const QuizPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Pause overlay */}
+      {isPaused && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-4">Quiz Paused</h2>
+            <p className="mb-6">Your time has been paused. Click Resume to continue.</p>
+            <Button 
+              type="primary" 
+              size="large" 
+              onClick={togglePause}
+            >
+              Resume Quiz
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Current question card */}
-      {currentQuestion && (
+      {currentQuestion && !isPaused && (
         <Card 
           className="shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-lg overflow-hidden mb-8"
           bodyStyle={{ padding: 0 }}
@@ -362,76 +503,80 @@ export const QuizPage: React.FC = () => {
       )}
 
       {/* Progress indicators */}
-      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <div className="mb-2 font-medium">Question Status</div>
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          {questions.map((question, index) => {
-            const isAnswered = answers[question._id] !== undefined;
-            const isFlagged = flaggedQuestions.includes(question._id);
-            const isVisited = visitedQuestions.includes(index);
-            const isCurrent = currentQuestionIndex === index;
-            
-            return (
-              <div
-                key={index}
-                className={`h-8 rounded flex items-center justify-center text-xs font-bold ${
-                  isCurrent 
-                    ? 'bg-blue-500 text-white' 
-                    : isAnswered 
-                      ? 'bg-green-500 text-white' 
-                      : isVisited 
-                        ? 'bg-yellow-500 text-white' 
-                        : 'bg-gray-200 text-gray-700'
-                } ${isFlagged ? 'ring-2 ring-red-500' : ''}`}
-              >
-                {index + 1}
-              </div>
-            );
-          })}
+      {!isPaused && (
+        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+          <div className="mb-2 font-medium">Question Status</div>
+          <div className="grid grid-cols-10 gap-2 mb-4">
+            {questions.map((question, index) => {
+              const isAnswered = answers[question._id] !== undefined;
+              const isFlagged = flaggedQuestions.includes(question._id);
+              const isVisited = visitedQuestions.includes(index);
+              const isCurrent = currentQuestionIndex === index;
+              
+              return (
+                <div
+                  key={index}
+                  className={`h-8 rounded flex items-center justify-center text-xs font-bold ${
+                    isCurrent 
+                      ? 'bg-blue-500 text-white' 
+                      : isAnswered 
+                        ? 'bg-green-500 text-white' 
+                        : isVisited 
+                          ? 'bg-yellow-500 text-white' 
+                          : 'bg-gray-200 text-gray-700'
+                  } ${isFlagged ? 'ring-2 ring-red-500' : ''}`}
+                >
+                  {index + 1}
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+              <span>Current</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+              <span>Answered</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+              <span>Visited</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gray-200 rounded mr-2"></div>
+              <span>Not Visited</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gray-300 rounded mr-2 ring-2 ring-red-500"></div>
+              <span>Flagged</span>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
-            <span>Current</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
-            <span>Answered</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
-            <span>Visited</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-gray-200 rounded mr-2"></div>
-            <span>Not Visited</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-gray-300 rounded mr-2 ring-2 ring-red-500"></div>
-            <span>Flagged</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Submit button */}
-      <div className="bg-white shadow-md rounded-lg p-6 text-center">
-        <p className="mb-4 text-gray-600">
-          Ready to submit? You have answered {Object.keys(answers).length} out of {questions.length} questions.
-        </p>
-        <Button
-          type="primary"
-          size="large"
-          onClick={handleSubmit}
-          loading={isSubmitting}
-          disabled={isSubmitting}
-          className="px-8"
-        >
-          <span className="inline-flex items-center">
-            Submit Quiz <CheckIcon />
-          </span>
-        </Button>
-      </div>
+      {!isPaused && (
+        <div className="bg-white shadow-md rounded-lg p-6 text-center">
+          <p className="mb-4 text-gray-600">
+            Ready to submit? You have answered {Object.keys(answers).length} out of {questions.length} questions.
+          </p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={handleSubmit}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            className="px-8"
+          >
+            <span className="inline-flex items-center">
+              Submit Quiz <CheckIcon />
+            </span>
+          </Button>
+        </div>
+      )}
 
       {/* Time warning modal */}
       <Modal

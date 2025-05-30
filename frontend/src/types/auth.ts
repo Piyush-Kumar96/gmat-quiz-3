@@ -4,6 +4,7 @@ export interface User {
   fullName: string;
   targetScore: number;
   createdAt: string;
+  phoneNumber?: string;
 }
 
 export interface LoginCredentials {
@@ -14,25 +15,29 @@ export interface LoginCredentials {
 export interface RegisterCredentials extends LoginCredentials {
   fullName: string;
   targetScore: number;
+  phoneNumber?: string;
 }
 
 export interface AuthResponse {
   user: User;
   token: string;
+  expiresIn?: string;
 }
 
-export interface UserProfile {
-  _id: string;
-  email: string;
-  fullName: string;
-  targetScore: number;
-  quizzesTaken: number;
+// Interface for user performance statistics
+export interface UserStats {
+  totalQuizzes: number;
   averageScore: number;
-  breakdownByType: {
-    [questionType: string]: {
-      total: number;
-      correct: number;
-      percentage: number;
-    };
-  };
+  questionTypeStats?: Array<{
+    type: string;
+    total: number;
+    correct: number;
+    percentage: number;
+  }>;
+}
+
+// Expanded user profile with performance stats
+export interface UserProfile {
+  user: User;
+  stats: UserStats;
 } 

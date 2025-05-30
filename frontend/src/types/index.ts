@@ -14,7 +14,24 @@ export interface QuizConfig {
   timeLimit: number;
   category?: string;
   questionType?: string;
-  difficulty?: number;
+  difficulty?: string | number;
+  
+  // Additional configuration options
+  questionTypeMode?: 'balanced' | 'specific';
+  difficultyMode?: 'mixed' | 'specific';
+  categoryMode?: 'mixed' | 'specific';
+  
+  // New options for enhanced configuration
+  questionMode?: 'all' | 'incorrect' | 'specific' | 'custom';
+  timeMode?: 'unlimited' | 'timed';
+  studyMode?: 'study' | 'exam';
+  hours?: number;
+  minutes?: number;
+  
+  // Multi-select options
+  selectedQuestionTypes?: string[];
+  selectedCategories?: string[];
+  selectedDifficulties?: string[];
 }
 
 export interface QuizResult {

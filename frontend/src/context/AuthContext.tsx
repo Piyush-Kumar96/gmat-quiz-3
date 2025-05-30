@@ -1,27 +1,29 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { User, UserProfile } from '../types/auth';
-import { login as authLogin, register as authRegister, logout as authLogout, getCurrentUser, isAuthenticated } from '../services/authService';
+import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import { login as loginService, register as registerService, logout as logoutService, getCurrentUser, isAuthenticated } from '../services/authService';
+import { LoginCredentials, RegisterCredentials, User, UserStats } from '../types/auth';
 
 interface AuthContextType {
   user: User | null;
-  profile: UserProfile | null;
+  stats: UserStats | null;
   loading: boolean;
-  error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, targetScore: number) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => void;
-  clearError: () => void;
+  error: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create context with default values
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  stats: null,
+  loading: true,
+  login: async () => {},
+  register: async () => {},
+  logout: () => {},
+  error: null,
+});
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -29,89 +31,97 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load user from storage on mount
   useEffect(() => {
     const loadUser = async () => {
-      if (isAuthenticated()) {
-        try {
-          const userProfile = await getCurrentUser();
-          setProfile(userProfile);
-          setUser({
-            _id: userProfile._id,
-            email: userProfile.email,
-            fullName: userProfile.fullName,
-            targetScore: userProfile.targetScore,
-            createdAt: new Date().toISOString(), // This will be updated when we get the actual data
-          });
-        } catch (err) {
-          console.error('Failed to load user profile', err);
-          authLogout();
+      try {
+        setLoading(true);
+        
+        if (isAuthenticated()) {
+          try {
+            const profileData = await getCurrentUser();
+            // Set user and stats from the profile data
+            setUser(profileData.user);
+            setStats(profileData.stats);
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+            // If getting user profile fails, token might be invalid
+            logoutService();
+            setUser(null);
+            setStats(null);
+          }
         }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     loadUser();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (credentials: LoginCredentials) => {
     try {
       setLoading(true);
       setError(null);
-      const { user } = await authLogin({ email, password });
-      setUser(user);
-      
-      // Load profile data
-      const userProfile = await getCurrentUser();
-      setProfile(userProfile);
-    } catch (err) {
-      setError('Invalid email or password');
-      throw err;
+      const response = await loginService(credentials);
+      setUser(response.user);
+      // After login, fetch user profile to get stats
+      try {
+        const profileData = await getCurrentUser();
+        setStats(profileData.stats);
+      } catch (profileError) {
+        console.error('Error fetching user profile after login:', profileError);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Failed to login');
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (email: string, password: string, fullName: string, targetScore: number) => {
+  const register = async (credentials: RegisterCredentials) => {
     try {
       setLoading(true);
       setError(null);
-      const { user } = await authRegister({ email, password, fullName, targetScore });
-      setUser(user);
-      
-      // Load profile data
-      const userProfile = await getCurrentUser();
-      setProfile(userProfile);
-    } catch (err) {
-      setError('Registration failed. Email may already be in use.');
-      throw err;
+      const response = await registerService(credentials);
+      setUser(response.user);
+      // New users won't have stats yet, but set an empty object
+      setStats({
+        totalQuizzes: 0,
+        averageScore: 0
+      });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message || 'Failed to register');
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
-    authLogout();
+    logoutService();
     setUser(null);
-    setProfile(null);
-  };
-
-  const clearError = () => {
-    setError(null);
+    setStats(null);
+    setLoading(false);
   };
 
   const value = {
     user,
-    profile,
+    stats,
     loading,
-    error,
     login,
     register,
     logout,
-    clearError,
+    error,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

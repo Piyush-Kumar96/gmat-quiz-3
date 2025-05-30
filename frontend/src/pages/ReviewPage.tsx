@@ -79,6 +79,9 @@ interface EditingQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
+  statement1?: string;
+  statement2?: string;
+  questionType?: string;
 }
 
 const ReviewPage: React.FC = () => {
@@ -149,12 +152,37 @@ const ReviewPage: React.FC = () => {
       options.push('');
     }
     
+    // Extract statement 1 and statement 2 for Data Sufficiency questions
+    let statement1 = '';
+    let statement2 = '';
+    
+    // Attempt to extract statements from question text for Data Sufficiency questions
+    if (question.questionType === 'Data Sufficiency') {
+      // Regular expression to find statement 1 and statement 2
+      const statement1Regex = /\(1\)(.*?)(?=\(2\)|$)/s;
+      const statement2Regex = /\(2\)(.*?)(?=$)/s;
+      
+      const statement1Match = question.questionText.match(statement1Regex);
+      const statement2Match = question.questionText.match(statement2Regex);
+      
+      if (statement1Match) {
+        statement1 = statement1Match[1].trim();
+      }
+      
+      if (statement2Match) {
+        statement2 = statement2Match[1].trim();
+      }
+    }
+    
     setEditingQuestion({
       _id: question._id,
       questionText: question.questionText,
       options: options,
       correctAnswer: question.correctAnswer || '',
-      explanation: question.explanation || ''
+      explanation: question.explanation || '',
+      statement1: statement1,
+      statement2: statement2,
+      questionType: question.questionType
     });
   };
 
@@ -199,8 +227,30 @@ const ReviewPage: React.FC = () => {
         optionsObject[key] = option;
       });
       
+      // For Data Sufficiency questions, update the question text with statements
+      let finalQuestionText = editingQuestion.questionText;
+      
+      if (editingQuestion.questionType === 'Data Sufficiency' && 
+          (editingQuestion.statement1 || editingQuestion.statement2)) {
+        
+        // Extract the main question part (before statements)
+        let mainQuestion = editingQuestion.questionText;
+        
+        // Remove existing statements if they exist
+        const statementRegex = /\([1-2]\).*?(?=\([1-2]\)|$)/gs;
+        mainQuestion = mainQuestion.replace(statementRegex, '').trim();
+        
+        // Check if the question ends with question mark and add if missing
+        if (!mainQuestion.endsWith('?')) {
+          mainQuestion = mainQuestion.replace(/\s*\??\s*$/, '?');
+        }
+        
+        // Reconstruct the question with updated statements
+        finalQuestionText = `${mainQuestion} (1) ${editingQuestion.statement1 || ''} (2) ${editingQuestion.statement2 || ''}`;
+      }
+      
       const questionData = {
-        questionText: editingQuestion.questionText,
+        questionText: finalQuestionText,
         options: optionsObject,
         correctAnswer: editingQuestion.correctAnswer,
         explanation: editingQuestion.explanation
@@ -323,6 +373,32 @@ const ReviewPage: React.FC = () => {
               />
             </div>
             
+            {/* Add Data Sufficiency specific fields */}
+            {editingQuestion.questionType === 'Data Sufficiency' && (
+              <div className="border-b pb-4">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Statement 1</label>
+                  <Input.TextArea
+                    value={editingQuestion.statement1}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, statement1: e.target.value })}
+                    rows={2}
+                    className="w-full"
+                    placeholder="Enter Statement 1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Statement 2</label>
+                  <Input.TextArea
+                    value={editingQuestion.statement2}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, statement2: e.target.value })}
+                    rows={2}
+                    className="w-full"
+                    placeholder="Enter Statement 2"
+                  />
+                </div>
+              </div>
+            )}
+            
             <div className="border-b pb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
               {editingQuestion.options.map((option, index) => (
@@ -336,8 +412,8 @@ const ReviewPage: React.FC = () => {
                     className="flex-1"
                   />
                   <Radio
-                    checked={editingQuestion.correctAnswer === option}
-                    onChange={() => handleCorrectAnswerChange(option)}
+                    checked={editingQuestion.correctAnswer === String.fromCharCode(65 + index)}
+                    onChange={() => handleCorrectAnswerChange(String.fromCharCode(65 + index))}
                     className="ml-2"
                   />
                   <span className="ml-1 text-xs text-gray-500">Correct</span>
