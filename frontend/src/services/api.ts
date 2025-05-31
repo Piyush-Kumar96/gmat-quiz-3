@@ -89,6 +89,29 @@ export const deleteQuestionBagItem = async (id: string) => {
   }
 };
 
+/**
+ * Create a new question in QuestionBagV2
+ * @param questionData Question data to create
+ */
+export const createQuestionBagItem = async (questionData: any) => {
+  try {
+    const response = await api.post('/question-bag-v2', {
+      ...questionData,
+      // Add a field to indicate this question was added from the platform
+      source: questionData.source || 'Added on the Platform',
+      sourceDetails: {
+        ...(questionData.sourceDetails || {}),
+        addedFromPlatform: true,
+        addedDate: new Date().toISOString()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating question in question bag:', error);
+    throw error;
+  }
+};
+
 interface QuestionBagFilters {
   page?: number;
   limit?: number;

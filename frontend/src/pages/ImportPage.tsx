@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { importPDF } from '../services/api';
+import { Typography } from 'antd';
+
+const { Text } = Typography;
 
 export const ImportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -97,6 +100,23 @@ export const ImportPage: React.FC = () => {
             </button>
           </div>
         </form>
+
+        <div className="mt-8 bg-green-50 p-6 rounded-lg border border-green-200 shadow-sm">
+          <h3 className="text-xl font-semibold mb-4 text-green-700">Development Notice</h3>
+          <Text className="text-green-700 block mb-3">
+            <span className="font-semibold">This feature is currently under development.</span> When completed, it will enable:
+          </Text>
+          <ul className="list-disc pl-6 text-green-700 space-y-2">
+            <li>Importing GMAT questions from various PDF formats</li>
+            <li>Batch uploads of multiple files</li>
+            <li>Automatic question categorization and difficulty assessment</li>
+            <li>Support for Excel/CSV uploads with predefined formats</li>
+            <li>Question validation and duplicate detection</li>
+          </ul>
+          <Text className="text-green-700 block mt-3">
+            Our team is working to make this feature available soon. Thank you for your patience!
+          </Text>
+        </div>
       </div>
     </div>
   );

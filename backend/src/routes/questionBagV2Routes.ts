@@ -667,4 +667,26 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Create a new question
+router.post('/', async (req, res) => {
+  try {
+    const questionData = req.body;
+    
+    console.log('Creating new question with data:', JSON.stringify(questionData, null, 2));
+    
+    // Create the question
+    const newQuestion = new QuestionBagV2(questionData);
+    await newQuestion.save();
+    
+    // Transform the question for frontend
+    const transformedQuestion = transformQuestionForFrontend(newQuestion);
+    
+    console.log('Question created successfully with ID:', newQuestion._id);
+    res.status(201).json(transformedQuestion);
+  } catch (error) {
+    console.error('Error creating question:', error);
+    res.status(500).json({ message: 'Failed to create question', error });
+  }
+});
+
 export default router; 

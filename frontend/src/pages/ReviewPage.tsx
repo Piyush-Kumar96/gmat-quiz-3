@@ -103,7 +103,6 @@ interface NewQuestion {
   category: string;
   difficulty: number;
   passage?: string;
-  source?: string;
   metadata?: {
     statement1?: string;
     statement2?: string;
@@ -199,8 +198,8 @@ const ReviewPage: React.FC = () => {
     // Attempt to extract statements from question text for Data Sufficiency questions
     if (question.questionType === 'Data Sufficiency') {
       // Regular expression to find statement 1 and statement 2
-      const statement1Regex = /\(1\)(.*?)(?=\(2\)|$)/s;
-      const statement2Regex = /\(2\)(.*?)(?=$)/s;
+      const statement1Regex = /\(1\)(.*?)(?=\(2\)|$)/;
+      const statement2Regex = /\(2\)(.*?)(?=$)/;
       
       const statement1Match = question.questionText.match(statement1Regex);
       const statement2Match = question.questionText.match(statement2Regex);
@@ -277,7 +276,7 @@ const ReviewPage: React.FC = () => {
         let mainQuestion = editingQuestion.questionText;
         
         // Remove existing statements if they exist
-        const statementRegex = /\([1-2]\).*?(?=\([1-2]\)|$)/gs;
+        const statementRegex = /\([1-2]\).*?(?=\([1-2]\)|$)/g;
         mainQuestion = mainQuestion.replace(statementRegex, '').trim();
         
         // Check if the question ends with question mark and add if missing
@@ -314,63 +313,11 @@ const ReviewPage: React.FC = () => {
     }
   };
 
-  // Create new question
-  const createQuestion = async () => {
-    try {
-      setIsCreating(true);
-      
-      // Validate the form
-      await form.validateFields();
-      
-      // Get form values
-      const values = form.getFieldsValue();
-      
-      // Create metadata object based on question type
-      let metadata: any = {};
-      
-      if (values.questionType === 'Data Sufficiency') {
-        metadata = {
-          statement1: values.statement1 || '',
-          statement2: values.statement2 || '',
-        };
-      } else if (values.questionType === 'Reading Comprehension' || values.questionType === 'Critical Reasoning') {
-        metadata = {
-          passage: values.passage || '',
-          argument: values.argument || '',
-        };
-      }
-      
-      // Create the question object
-      const questionData = {
-        questionText: values.questionText,
-        options: values.options,
-        correctAnswer: values.correctAnswer,
-        explanation: values.explanation,
-        questionType: values.questionType,
-        category: values.category,
-        difficulty: values.difficulty,
-        source: values.source || 'User Added',
-        metadata: metadata
-      };
-      
-      // Call API to create the question
-      await createQuestionBagItem(questionData);
-      
-      // Show success message
-      message.success('Question created successfully');
-      
-      // Invalidate the questions query to refetch the data
-      queryClient.invalidateQueries({ queryKey: ['questions'] });
-      
-      // Reset form and close modal
-      form.resetFields();
-      setIsAddingQuestion(false);
-    } catch (error) {
-      console.error('Error creating question:', error);
-      message.error('Failed to create question. Please check your inputs and try again.');
-    } finally {
-      setIsCreating(false);
-    }
+  // Function to handle opening the Add Question modal
+  const handleAddQuestionClick = () => {
+    // Reset form when opening modal
+    form.resetFields();
+    setIsAddingQuestion(true);
   };
 
   // Define question renderer
@@ -615,6 +562,82 @@ const ReviewPage: React.FC = () => {
     ],
   };
 
+  // Create new question
+  const createQuestion = async () => {
+    try {
+      setIsCreating(true);
+      
+      // Validate the form
+      await form.validateFields();
+      
+      // Get form values
+      const values = form.getFieldsValue();
+      
+      // Create metadata object based on question type
+      let metadata: any = {};
+      
+      if (values.questionType === 'Data Sufficiency') {
+        metadata = {
+          statement1: values.statement1 || '',
+          statement2: values.statement2 || '',
+        };
+      } else if (values.questionType === 'Reading Comprehension' || values.questionType === 'Critical Reasoning') {
+        metadata = {
+          passage: values.passage || '',
+          argument: values.argument || '',
+        };
+      }
+      
+      // For Reading Comprehension questions, add passage to main question object too
+      let additionalFields = {};
+      if (values.questionType === 'Reading Comprehension' && values.passage) {
+        additionalFields = {
+          passageText: values.passage,
+          // Generate a random RC number to group questions if needed later
+          rcNumber: `RC_${Date.now()}`
+        };
+      } else if (values.questionType === 'Critical Reasoning' && values.passage) {
+        additionalFields = {
+          passageText: values.passage
+        };
+      }
+      
+      // Create the question object
+      const questionData = {
+        questionText: values.questionText,
+        options: values.options || { A: '', B: '', C: '', D: '', E: '' },
+        correctAnswer: values.correctAnswer,
+        explanation: values.explanation,
+        questionType: values.questionType,
+        category: values.category,
+        difficulty: values.difficulty,
+        source: "Added on the Platform",
+        metadata: metadata,
+        ...additionalFields
+      };
+      
+      console.log('Submitting question data:', questionData);
+      
+      // Call API to create the question
+      await createQuestionBagItem(questionData);
+      
+      // Show success message
+      message.success('Question created successfully');
+      
+      // Invalidate the questions query to refetch the data
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      
+      // Reset form and close modal
+      form.resetFields();
+      setIsAddingQuestion(false);
+    } catch (error) {
+      console.error('Error creating question:', error);
+      message.error('Failed to create question. Please check your inputs and try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
@@ -623,10 +646,9 @@ const ReviewPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <Button
               type="primary"
-              icon={<FileAddIcon />}
               size="large"
-              onClick={() => setIsAddingQuestion(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+              onClick={handleAddQuestionClick}
+              className="bg-blue-400 hover:bg-blue-500 border-blue-400 hover:border-blue-500 h-10 flex items-center px-4 py-2 rounded-lg shadow-md text-white"
             >
               Add New Question
             </Button>
@@ -927,32 +949,26 @@ const ReviewPage: React.FC = () => {
                 
                 return (
                   <div>
-                    <Form.List name="options">
-                      {(fields, { add, remove }) => (
-                        <>
-                          {['A', 'B', 'C', 'D', 'E'].map((letter, index) => (
-                            <div key={letter} className="flex items-center mb-3">
-                              <div className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-full mr-2">
-                                {letter}
-                              </div>
-                              <Form.Item
-                                name={letter}
-                                className="flex-1 mb-0"
-                                rules={[{ required: index < 2, message: `Option ${letter} is required` }]}
-                              >
-                                <Input placeholder={`Option ${letter}`} />
-                              </Form.Item>
-                              <Form.Item name="correctAnswer" noStyle>
-                                <Radio.Group className="ml-2">
-                                  <Radio value={letter} />
-                                </Radio.Group>
-                              </Form.Item>
-                              <span className="ml-1 text-xs text-gray-500">Correct</span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                    </Form.List>
+                    {['A', 'B', 'C', 'D', 'E'].map((letter) => (
+                      <div key={letter} className="flex items-center mb-3">
+                        <div className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-full mr-2">
+                          {letter}
+                        </div>
+                        <Form.Item
+                          name={['options', letter]}
+                          className="flex-1 mb-0"
+                          rules={[{ required: letter === 'A' || letter === 'B', message: `Option ${letter} is required` }]}
+                        >
+                          <Input placeholder={`Option ${letter}`} />
+                        </Form.Item>
+                        <Form.Item name="correctAnswer" noStyle>
+                          <Radio.Group className="ml-2">
+                            <Radio value={letter} />
+                          </Radio.Group>
+                        </Form.Item>
+                        <span className="ml-1 text-xs text-gray-500">Correct</span>
+                      </div>
+                    ))}
                   </div>
                 );
               }}
@@ -965,13 +981,6 @@ const ReviewPage: React.FC = () => {
             rules={[{ required: true, message: 'Please provide an explanation' }]}
           >
             <TextArea rows={4} placeholder="Enter the explanation for the correct answer" />
-          </Form.Item>
-          
-          <Form.Item
-            name="source"
-            label="Source (Optional)"
-          >
-            <Input placeholder="e.g., GMAT Prep, Official Guide, Custom" />
           </Form.Item>
         </Form>
       </Modal>

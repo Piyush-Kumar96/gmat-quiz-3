@@ -12,12 +12,29 @@ export const Navbar: React.FC = () => {
     if (path === '/') {
       return location.pathname === '/';
     }
+    
+    // Special case for Quiz section - highlight for both /quiz and /config paths
+    if (path === '/quiz') {
+      return location.pathname.startsWith('/quiz') || location.pathname.startsWith('/config');
+    }
+    
     return location.pathname.startsWith(path);
   };
   
   // Get the CSS classes for a nav link based on active state
   const getLinkClasses = (path: string): string => {
     const baseClasses = "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200";
+    
+    // Special case for Import page - use green color scheme
+    if (path === '/import' && isActive(path)) {
+      return `${baseClasses} border-green-500 text-green-700 font-semibold`;
+    }
+    
+    // Special case for Quiz page - use blue color scheme from homepage
+    if (path === '/quiz' && isActive(path)) {
+      return `${baseClasses} border-blue-500 text-blue-700 font-semibold`;
+    }
+    
     const activeClasses = "border-indigo-500 text-indigo-600 font-semibold";
     const inactiveClasses = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700";
     
@@ -27,6 +44,17 @@ export const Navbar: React.FC = () => {
   // Get the CSS classes for a mobile nav link based on active state
   const getMobileLinkClasses = (path: string): string => {
     const baseClasses = "block pl-3 pr-4 py-2 border-l-4 text-base font-medium";
+    
+    // Special case for Import page - use green color scheme
+    if (path === '/import' && isActive(path)) {
+      return `${baseClasses} bg-green-50 border-green-500 text-green-700`;
+    }
+    
+    // Special case for Quiz page - use blue color scheme from homepage
+    if (path === '/quiz' && isActive(path)) {
+      return `${baseClasses} bg-blue-50 border-blue-500 text-blue-700`;
+    }
+    
     const activeClasses = "bg-indigo-50 border-indigo-500 text-indigo-700";
     const inactiveClasses = "border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700";
     
