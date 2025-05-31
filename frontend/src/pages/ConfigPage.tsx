@@ -274,7 +274,7 @@ export const ConfigPage: React.FC = () => {
                   
                   {/* Data Insights Section */}
                   <div className="bg-gray-50 rounded p-2 border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
+          <div>
                       <Text strong className="text-gray-500 text-sm">Data Insights</Text>
                       <div className="flex gap-1 mt-1">
                         <Tag color="default" className="px-1 py-0 text-xs">10 Q</Tag>
@@ -336,8 +336,8 @@ export const ConfigPage: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-base font-medium text-blue-700 flex items-center">
                       <ListIcon />
-                      Number of Questions
-                    </label>
+              Number of Questions
+            </label>
                     <Tooltip title="Choose how many questions to include in your quiz">
                       <InfoIcon />
                     </Tooltip>
@@ -345,7 +345,7 @@ export const ConfigPage: React.FC = () => {
                   <InputNumber
                     min={5}
                     max={50}
-                    value={config.count}
+              value={config.count}
                     onChange={(value) => setConfig(prev => ({ ...prev, count: value as number }))}
                     className="w-full"
                     size="large"
@@ -354,14 +354,14 @@ export const ConfigPage: React.FC = () => {
                   <Text className="text-xs text-gray-500 mt-2 block">
                     Recommended: 20-30 questions for a balanced test
                   </Text>
-                </div>
+          </div>
 
                 <div className="bg-white p-5 rounded-lg border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-base font-medium text-blue-700 flex items-center">
                       <ClockIcon />
-                      Time Limit (minutes)
-                    </label>
+              Time Limit (minutes)
+            </label>
                     <Tooltip title="Set how much time you'll have to complete the quiz">
                       <InfoIcon />
                     </Tooltip>
@@ -369,7 +369,7 @@ export const ConfigPage: React.FC = () => {
                   <InputNumber
                     min={5}
                     max={180}
-                    value={config.timeLimit}
+              value={config.timeLimit}
                     onChange={(value) => setConfig(prev => ({ ...prev, timeLimit: value as number }))}
                     className="w-full"
                     size="large"
@@ -739,8 +739,8 @@ export const ConfigPage: React.FC = () => {
                         </div>
                       );
                     })}
-                  </div>
-                  
+          </div>
+
                   {config.selectedCategories?.includes('Data Insights') && (
                     <div className="mt-4 bg-yellow-50 p-3 rounded border border-yellow-200">
                       <Text className="text-yellow-700 flex items-center">
@@ -779,7 +779,7 @@ export const ConfigPage: React.FC = () => {
                 Start Custom Quiz
               </Button>
             </div>
-          </form>
+        </form>
         </Card>
       </div>
     </div>

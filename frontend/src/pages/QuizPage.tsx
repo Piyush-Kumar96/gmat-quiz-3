@@ -74,11 +74,7 @@ export const QuizPage: React.FC = () => {
   useEffect(() => {
     if (!location.state?.config) {
       // Redirect to config page if accessed directly
-      navigate('/config', { 
-        state: { 
-          message: 'Please customize your quiz before starting.'
-        }
-      });
+      navigate('/config');
       return;
     }
   }, [location.state, navigate]);
@@ -358,8 +354,8 @@ export const QuizPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header with timer and pause button */}
-      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+      {/* Header with timer and pause button - now sticky */}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6 sticky top-0 z-40">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">GMAT Quiz</h1>
           <div className="flex items-center gap-4">
@@ -401,10 +397,9 @@ export const QuizPage: React.FC = () => {
           </div>
           
           <Button 
-            type="primary" 
             onClick={nextQuestion}
             disabled={currentQuestionIndex === questions.length - 1}
-            className="flex items-center"
+            className="flex items-center bg-gray-700 hover:bg-gray-600 text-white border-0 shadow-md rounded-lg px-6"
           >
             <span className="inline-flex items-center">
               Next Question <ArrowRightIcon />
@@ -413,19 +408,32 @@ export const QuizPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Spacer to prevent content from being hidden under sticky header */}
+      <div className="h-4"></div>
+
       {/* Pause overlay */}
       {isPaused && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-lg max-w-md text-center">
             <h2 className="text-2xl font-bold mb-4">Quiz Paused</h2>
-            <p className="mb-6">Your time has been paused. Click Resume to continue.</p>
-            <Button 
-              type="primary" 
-              size="large" 
-              onClick={togglePause}
-            >
-              Resume Quiz
-            </Button>
+            <p className="mb-6">Your time has been paused. You can resume the quiz or end it now.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="large" 
+                onClick={togglePause}
+                className="bg-gray-700 hover:bg-gray-600 border-0 text-white shadow-md rounded-lg font-medium min-w-32"
+              >
+                Resume Quiz
+              </Button>
+              <Button 
+                danger
+                size="large" 
+                onClick={handleSubmit}
+                className="border-red-500 text-red-500 hover:bg-red-50 min-w-32"
+              >
+                End Quiz
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -473,14 +481,13 @@ export const QuizPage: React.FC = () => {
           </div>
 
           {/* Footer with navigation */}
-          <div className="flex justify-between items-center pt-4 mt-4 border-t border-gray-100 p-4 bg-gray-50">
+          <div className="flex justify-end items-center pt-4 mt-4 border-t border-gray-100 p-4 bg-gray-50">
             {!isLastQuestion ? (
               <Button 
-                type="primary"
                 onClick={nextQuestion}
                 disabled={!currentAnswer}
                 size="large"
-                className="flex items-center"
+                className="flex items-center bg-gray-700 hover:bg-gray-600 text-white border-0 shadow-md rounded-lg px-6"
               >
                 <span className="inline-flex items-center">
                   Next Question <ArrowRightIcon />
@@ -491,7 +498,7 @@ export const QuizPage: React.FC = () => {
                 type="primary"
                 onClick={handleSubmit}
                 size="large"
-                className="flex items-center"
+                className="flex items-center bg-gray-700 hover:bg-gray-600 text-white border-0 shadow-md rounded-lg px-6"
               >
                 <span className="inline-flex items-center">
                   Submit Quiz <CheckIcon />
@@ -564,12 +571,11 @@ export const QuizPage: React.FC = () => {
             Ready to submit? You have answered {Object.keys(answers).length} out of {questions.length} questions.
           </p>
           <Button
-            type="primary"
             size="large"
             onClick={handleSubmit}
             loading={isSubmitting}
             disabled={isSubmitting}
-            className="px-8"
+            className="px-8 bg-gray-700 hover:bg-gray-600 text-white border-0 shadow-md rounded-lg min-w-40"
           >
             <span className="inline-flex items-center">
               Submit Quiz <CheckIcon />
