@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getQuestionBagV2, deleteQuestionBagItem, updateQuestionBagV2 } from '../services/api';
+import { getQuestionBagV2, deleteQuestionBagItem, updateQuestionBagV2, createQuestionBagItem } from '../services/api';
 import { Question } from '../types/quiz';
-import { Button, Card, Typography, Space, Tag, Pagination, Collapse, message, Form, Input, Radio, Tooltip } from 'antd';
-import { DeleteOutlined, EditOutlined, SaveOutlined, CloseOutlined, LinkOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Typography, Space, Tag, Pagination, Collapse, message, Form, Input, Radio, Tooltip, Modal, Select, Divider, Switch } from 'antd';
+import { DeleteOutlined, EditOutlined, SaveOutlined, CloseOutlined, LinkOutlined, PlusOutlined, FileAddOutlined } from '@ant-design/icons';
 import QuestionCard from '../components/QuestionCard';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
+const { TextArea } = Input;
+const { Option } = Select;
 
 // Use text labels instead of icons to avoid TypeScript errors
 const EyeIcon: React.FC<{ visible: boolean }> = ({ visible }) => (
@@ -58,6 +60,13 @@ const PlusIcon = () => (
   </span>
 );
 
+// Add FileAddIcon component
+const FileAddIcon = () => (
+  <span className="mr-2">
+    <FileAddOutlined onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+  </span>
+);
+
 interface QueryParams {
   page: number;
   limit: number;
@@ -84,6 +93,23 @@ interface EditingQuestion {
   questionType?: string;
 }
 
+// New Question interface for creating a new question
+interface NewQuestion {
+  questionText: string;
+  options: Record<string, string>;
+  correctAnswer: string;
+  explanation: string;
+  questionType: string;
+  category: string;
+  difficulty: number;
+  passage?: string;
+  source?: string;
+  metadata?: {
+    statement1?: string;
+    statement2?: string;
+  };
+}
+
 const ReviewPage: React.FC = () => {
   const [queryParams, setQueryParams] = useState<QueryParams>({
     page: 1,
@@ -93,6 +119,20 @@ const ReviewPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState<{ [key: string]: boolean }>({});
   const [editingQuestion, setEditingQuestion] = useState<EditingQuestion | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isAddingQuestion, setIsAddingQuestion] = useState<boolean>(false);
+  const [newQuestion, setNewQuestion] = useState<NewQuestion>({
+    questionText: '',
+    options: { A: '', B: '', C: '', D: '', E: '' },
+    correctAnswer: 'A',
+    explanation: '',
+    questionType: 'Problem Solving',
+    category: 'Quantitative Reasoning',
+    difficulty: 2,
+    passage: '',
+    metadata: {}
+  });
+  const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [form] = Form.useForm();
 
   const queryClient = useQueryClient();
 
@@ -271,6 +311,65 @@ const ReviewPage: React.FC = () => {
       message.error('Failed to update question. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Create new question
+  const createQuestion = async () => {
+    try {
+      setIsCreating(true);
+      
+      // Validate the form
+      await form.validateFields();
+      
+      // Get form values
+      const values = form.getFieldsValue();
+      
+      // Create metadata object based on question type
+      let metadata: any = {};
+      
+      if (values.questionType === 'Data Sufficiency') {
+        metadata = {
+          statement1: values.statement1 || '',
+          statement2: values.statement2 || '',
+        };
+      } else if (values.questionType === 'Reading Comprehension' || values.questionType === 'Critical Reasoning') {
+        metadata = {
+          passage: values.passage || '',
+          argument: values.argument || '',
+        };
+      }
+      
+      // Create the question object
+      const questionData = {
+        questionText: values.questionText,
+        options: values.options,
+        correctAnswer: values.correctAnswer,
+        explanation: values.explanation,
+        questionType: values.questionType,
+        category: values.category,
+        difficulty: values.difficulty,
+        source: values.source || 'User Added',
+        metadata: metadata
+      };
+      
+      // Call API to create the question
+      await createQuestionBagItem(questionData);
+      
+      // Show success message
+      message.success('Question created successfully');
+      
+      // Invalidate the questions query to refetch the data
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      
+      // Reset form and close modal
+      form.resetFields();
+      setIsAddingQuestion(false);
+    } catch (error) {
+      console.error('Error creating question:', error);
+      message.error('Failed to create question. Please check your inputs and try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -495,18 +594,19 @@ const ReviewPage: React.FC = () => {
   // Filter options
   const filterOptions = {
     category: [
-      { text: 'Quantitative', value: 'Quantitative' },
-      { text: 'Verbal', value: 'Verbal' },
-      { text: 'Integrated Reasoning', value: 'Integrated Reasoning' },
-      { text: 'Analytical Writing', value: 'Analytical Writing' },
+      { text: 'Quantitative Reasoning', value: 'Quantitative Reasoning' },
+      { text: 'Verbal Reasoning', value: 'Verbal Reasoning' },
+      { text: 'Data Insights', value: 'Data Insights' }
     ],
     questionType: [
-      { text: 'Multiple Choice', value: 'Multiple Choice' },
       { text: 'Problem Solving', value: 'Problem Solving' },
       { text: 'Data Sufficiency', value: 'Data Sufficiency' },
       { text: 'Reading Comprehension', value: 'Reading Comprehension' },
       { text: 'Critical Reasoning', value: 'Critical Reasoning' },
-      { text: 'Sentence Correction', value: 'Sentence Correction' },
+      { text: 'Multi-Source Reasoning', value: 'Multi-Source Reasoning' },
+      { text: 'Table Analysis', value: 'Table Analysis' },
+      { text: 'Graphics Interpretation', value: 'Graphics Interpretation' },
+      { text: 'Two-Part Analysis', value: 'Two-Part Analysis' }
     ],
     difficulty: [
       { text: 'Easy', value: 1 },
@@ -520,12 +620,23 @@ const ReviewPage: React.FC = () => {
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-center mb-6">
           <Title level={2}>Question Review</Title>
-          {!isLoading && !error && data?.total !== undefined && (
-            <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
-              <Text strong className="text-lg">{data.total}</Text>
-              <Text className="ml-2">Questions Found</Text>
-            </div>
-          )}
+          <div className="flex items-center space-x-4">
+            <Button
+              type="primary"
+              icon={<FileAddIcon />}
+              size="large"
+              onClick={() => setIsAddingQuestion(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+            >
+              Add New Question
+            </Button>
+            {!isLoading && !error && data?.total !== undefined && (
+              <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
+                <Text strong className="text-lg">{data.total}</Text>
+                <Text className="ml-2">Questions Found</Text>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-gray-50 p-4 rounded-lg mb-6 shadow-sm">
@@ -625,6 +736,245 @@ const ReviewPage: React.FC = () => {
           )}
         </>
       )}
+
+      {/* Add Question Modal */}
+      <Modal
+        title={
+          <div className="text-center text-xl font-bold text-indigo-700">
+            Add New Question
+          </div>
+        }
+        open={isAddingQuestion}
+        onCancel={() => setIsAddingQuestion(false)}
+        width={800}
+        footer={[
+          <Button key="cancel" onClick={() => setIsAddingQuestion(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={isCreating}
+            onClick={createQuestion}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            Create Question
+          </Button>,
+        ]}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            questionType: 'Problem Solving',
+            category: 'Quantitative Reasoning',
+            difficulty: 2,
+            options: { A: '', B: '', C: '', D: '', E: '' },
+            correctAnswer: 'A'
+          }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <Form.Item
+              name="category"
+              label="Category"
+              rules={[{ required: true, message: 'Please select a category' }]}
+            >
+              <Select>
+                {filterOptions.category.map(option => (
+                  <Option key={option.value} value={option.value}>
+                    {option.text}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            
+            <Form.Item
+              name="questionType"
+              label="Question Type"
+              rules={[{ required: true, message: 'Please select a question type' }]}
+            >
+              <Select>
+                {filterOptions.questionType.map(option => (
+                  <Option key={option.value} value={option.value}>
+                    {option.text}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            
+            <Form.Item
+              name="difficulty"
+              label="Difficulty"
+              rules={[{ required: true, message: 'Please select a difficulty level' }]}
+            >
+              <Select>
+                {filterOptions.difficulty.map(option => (
+                  <Option key={option.value} value={option.value}>
+                    {option.text}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </div>
+          
+          <Form.Item
+            name="questionText"
+            label="Question Text"
+            rules={[{ required: true, message: 'Please enter the question text' }]}
+          >
+            <TextArea rows={4} placeholder="Enter the question text here" />
+          </Form.Item>
+          
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => 
+              prevValues.questionType !== currentValues.questionType
+            }
+          >
+            {({ getFieldValue }) => {
+              const questionType = getFieldValue('questionType');
+              
+              if (questionType === 'Data Sufficiency') {
+                return (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="font-medium mb-2 text-indigo-700">Data Sufficiency Statements</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Form.Item
+                        name="statement1"
+                        label="Statement 1"
+                        rules={[{ required: true, message: 'Please enter statement 1' }]}
+                      >
+                        <TextArea rows={2} placeholder="Enter statement 1" />
+                      </Form.Item>
+                      
+                      <Form.Item
+                        name="statement2"
+                        label="Statement 2"
+                        rules={[{ required: true, message: 'Please enter statement 2' }]}
+                      >
+                        <TextArea rows={2} placeholder="Enter statement 2" />
+                      </Form.Item>
+                    </div>
+                  </div>
+                );
+              }
+              
+              if (questionType === 'Reading Comprehension' || questionType === 'Critical Reasoning') {
+                return (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="font-medium mb-2 text-indigo-700">
+                      {questionType === 'Reading Comprehension' ? 'Passage' : 'Argument'}
+                    </div>
+                    <Form.Item
+                      name="passage"
+                      rules={[{ required: true, message: `Please enter the ${questionType === 'Reading Comprehension' ? 'passage' : 'argument'}` }]}
+                    >
+                      <TextArea 
+                        rows={6} 
+                        placeholder={`Enter the ${questionType === 'Reading Comprehension' ? 'passage' : 'argument'} text here`} 
+                      />
+                    </Form.Item>
+                  </div>
+                );
+              }
+              
+              return null;
+            }}
+          </Form.Item>
+          
+          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="font-medium mb-2 text-indigo-700">Answer Options</div>
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => 
+                prevValues.questionType !== currentValues.questionType
+              }
+            >
+              {({ getFieldValue }) => {
+                const questionType = getFieldValue('questionType');
+                
+                if (questionType === 'Data Sufficiency') {
+                  return (
+                    <div>
+                      <div className="mb-2 text-gray-600 text-sm">
+                        Data Sufficiency standard options:
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="p-2 bg-white border rounded">A: Statement (1) ALONE is sufficient, but statement (2) alone is not sufficient.</div>
+                        <div className="p-2 bg-white border rounded">B: Statement (2) ALONE is sufficient, but statement (1) alone is not sufficient.</div>
+                        <div className="p-2 bg-white border rounded">C: BOTH statements TOGETHER are sufficient, but NEITHER statement ALONE is sufficient.</div>
+                        <div className="p-2 bg-white border rounded">D: EACH statement ALONE is sufficient.</div>
+                        <div className="p-2 bg-white border rounded">E: Statements (1) and (2) TOGETHER are NOT sufficient.</div>
+                      </div>
+                      
+                      <Form.Item
+                        name="correctAnswer"
+                        label="Correct Answer"
+                        className="mt-4"
+                        rules={[{ required: true, message: 'Please select the correct answer' }]}
+                      >
+                        <Radio.Group buttonStyle="solid">
+                          <Radio.Button value="A">A</Radio.Button>
+                          <Radio.Button value="B">B</Radio.Button>
+                          <Radio.Button value="C">C</Radio.Button>
+                          <Radio.Button value="D">D</Radio.Button>
+                          <Radio.Button value="E">E</Radio.Button>
+                        </Radio.Group>
+                      </Form.Item>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div>
+                    <Form.List name="options">
+                      {(fields, { add, remove }) => (
+                        <>
+                          {['A', 'B', 'C', 'D', 'E'].map((letter, index) => (
+                            <div key={letter} className="flex items-center mb-3">
+                              <div className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-full mr-2">
+                                {letter}
+                              </div>
+                              <Form.Item
+                                name={letter}
+                                className="flex-1 mb-0"
+                                rules={[{ required: index < 2, message: `Option ${letter} is required` }]}
+                              >
+                                <Input placeholder={`Option ${letter}`} />
+                              </Form.Item>
+                              <Form.Item name="correctAnswer" noStyle>
+                                <Radio.Group className="ml-2">
+                                  <Radio value={letter} />
+                                </Radio.Group>
+                              </Form.Item>
+                              <span className="ml-1 text-xs text-gray-500">Correct</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </Form.List>
+                  </div>
+                );
+              }}
+            </Form.Item>
+          </div>
+          
+          <Form.Item
+            name="explanation"
+            label="Explanation"
+            rules={[{ required: true, message: 'Please provide an explanation' }]}
+          >
+            <TextArea rows={4} placeholder="Enter the explanation for the correct answer" />
+          </Form.Item>
+          
+          <Form.Item
+            name="source"
+            label="Source (Optional)"
+          >
+            <Input placeholder="e.g., GMAT Prep, Official Guide, Custom" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

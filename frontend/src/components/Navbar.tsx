@@ -1,10 +1,37 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Function to check if a path is active
+  const isActive = (path: string): boolean => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  };
+  
+  // Get the CSS classes for a nav link based on active state
+  const getLinkClasses = (path: string): string => {
+    const baseClasses = "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200";
+    const activeClasses = "border-indigo-500 text-indigo-600 font-semibold";
+    const inactiveClasses = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700";
+    
+    return `${baseClasses} ${isActive(path) ? activeClasses : inactiveClasses}`;
+  };
+  
+  // Get the CSS classes for a mobile nav link based on active state
+  const getMobileLinkClasses = (path: string): string => {
+    const baseClasses = "block pl-3 pr-4 py-2 border-l-4 text-base font-medium";
+    const activeClasses = "bg-indigo-50 border-indigo-500 text-indigo-700";
+    const inactiveClasses = "border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700";
+    
+    return `${baseClasses} ${isActive(path) ? activeClasses : inactiveClasses}`;
+  };
 
   const handleLogout = () => {
     logout();
@@ -24,25 +51,25 @@ export const Navbar: React.FC = () => {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
                 to="/"
-                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={getLinkClasses('/')}
               >
                 Home
               </Link>
               <Link
                 to="/quiz"
-                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={getLinkClasses('/quiz')}
               >
                 Quiz
               </Link>
               <Link
                 to="/review"
-                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={getLinkClasses('/review')}
               >
                 Review
               </Link>
               <Link
                 to="/import"
-                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={getLinkClasses('/import')}
               >
                 Import
               </Link>
@@ -53,7 +80,7 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <Link
                   to="/profile"
-                  className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/profile') ? 'bg-gray-100 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Profile
                 </Link>
@@ -68,13 +95,13 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <Link
                   to="/login"
-                  className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/login') ? 'bg-gray-100 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-2 rounded-md text-sm font-medium"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/register') ? 'bg-indigo-700 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                 >
                   Register
                 </Link>
@@ -115,25 +142,25 @@ export const Navbar: React.FC = () => {
         <div className="pt-2 pb-3 space-y-1">
           <Link
             to="/"
-            className="bg-indigo-50 border-indigo-500 text-indigo-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            className={getMobileLinkClasses('/')}
           >
             Home
           </Link>
           <Link
             to="/quiz"
-            className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            className={getMobileLinkClasses('/quiz')}
           >
             Quiz
           </Link>
           <Link
             to="/review"
-            className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            className={getMobileLinkClasses('/review')}
           >
             Review
           </Link>
           <Link
             to="/import"
-            className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            className={getMobileLinkClasses('/import')}
           >
             Import
           </Link>
@@ -143,7 +170,7 @@ export const Navbar: React.FC = () => {
             <div className="space-y-1">
               <Link
                 to="/profile"
-                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className={`block px-4 py-2 text-base font-medium ${isActive('/profile') ? 'bg-gray-100 text-indigo-600' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
               >
                 Profile
               </Link>
@@ -158,13 +185,13 @@ export const Navbar: React.FC = () => {
             <div className="space-y-1">
               <Link
                 to="/login"
-                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className={`block px-4 py-2 text-base font-medium ${isActive('/login') ? 'bg-gray-100 text-indigo-600' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
               >
                 Login
               </Link>
               <Link
                 to="/register"
-                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className={`block px-4 py-2 text-base font-medium ${isActive('/register') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
               >
                 Register
               </Link>
