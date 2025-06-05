@@ -69,6 +69,16 @@ export interface IQuestionBagV2 extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+  validationStatus: string | null;
+  validationIssues: string[];
+  proposedRevision: {
+    questionText: string;
+    options: string[];
+    metadata: {
+      statement1: string;
+      statement2: string;
+    };
+  } | null;
 }
 
 /**
@@ -120,6 +130,22 @@ const QuestionBagV2Schema = new Schema<IQuestionBagV2>(
         _id: false
       },
       _id: false
+    },
+    validationStatus: {
+      type: String,
+      enum: ['perfect', 'needs_revision', 'unfixable'],
+      default: null
+    },
+    validationIssues: [{
+      type: String
+    }],
+    proposedRevision: {
+      questionText: String,
+      options: [String],
+      metadata: {
+        statement1: String,
+        statement2: String
+      }
     }
   },
   {

@@ -64,10 +64,20 @@ const generateCacheKey = (questionText: string, options: string[]): string => {
 /**
  * Question data structure for processing by OpenAI
  */
-interface QuestionData {
+export interface QuestionData {
   questionText: string;
   options: string[];
+  correctAnswer: string;
   questionType?: string;
+  explanation?: string;
+  passageText?: string;
+  metadata?: {
+    statement1?: string;
+    statement2?: string;
+  };
+  responseFormat?: {
+    type: string;
+  };
 }
 
 /**
@@ -129,9 +139,10 @@ export const processQuestion = async (question: QuestionData): Promise<AIRespons
     console.log('Sending prompt to OpenAI:', prompt);
     
     // Call OpenAI API
-    console.log('Calling OpenAI API with model gpt-4...');
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',  // Using GPT-4 model
+    console.log('Calling OpenAI API with model gpt-4o-mini...');
+    
+    const requestParams: any = {
+      model: 'gpt-4o-mini',  // Using gpt-4o-mini model
       messages: [
         {
           role: 'system',
@@ -143,7 +154,14 @@ export const processQuestion = async (question: QuestionData): Promise<AIRespons
         }
       ],
       max_tokens: 500
-    });
+    };
+    
+    // Add response format if specified
+    if (question.responseFormat) {
+      requestParams.response_format = question.responseFormat;
+    }
+    
+    const response = await openai.chat.completions.create(requestParams);
     
     // Track token usage
     if (response.usage) {
@@ -151,44 +169,37 @@ export const processQuestion = async (question: QuestionData): Promise<AIRespons
       console.log(`Token usage: ${response.usage.total_tokens} (${response.usage.prompt_tokens} prompt, ${response.usage.completion_tokens} completion)`);
     }
     
-    // Log the full response for debugging
-    console.log('OpenAI response summary:', 
-      response.choices[0]?.message?.content ? 'Content received' : 'No content',
-      `Model: ${response.model}`,
-      `Tokens: ${response.usage?.total_tokens || 'unknown'}`
-    );
-    
     // Parse the response content
     const content = response.choices[0]?.message?.content || '';
-    let parsedResponse;
+    console.log('OpenAI response summary: Content received', 'Model:', response.model, 'Tokens:', response.usage?.total_tokens);
     
-    try {
-      parsedResponse = JSON.parse(content);
-    } catch (error) {
-      console.error('Failed to parse JSON response:', content);
-      throw new Error('Invalid JSON response from OpenAI');
+    // Create AI response
+    const aiResponse: AIResponse = {
+      aiAnswer: content,
+      aiExplanation: '',
+      questionDifficulty: 0
+    };
+    
+    // Try to parse JSON response if expected
+    if (!question.responseFormat) {
+      try {
+        const parsedResponse = JSON.parse(content);
+        aiResponse.aiAnswer = parsedResponse.answer || content;
+        aiResponse.aiExplanation = parsedResponse.explanation || '';
+        aiResponse.questionDifficulty = parsedResponse.difficulty || 0;
+      } catch (error) {
+        console.error('Failed to parse JSON response:', content);
+        // Use raw content as answer if parsing fails
+      }
     }
     
-    // Extract the answer data
-    const result = {
-      aiAnswer: parsedResponse.answer || '',
-      aiExplanation: parsedResponse.explanation || '',
-      questionDifficulty: parsedResponse.difficulty || 5,
-    };
+    // Cache the response
+    responseCache.set(cacheKey, aiResponse);
     
-    // Cache the result
-    responseCache.set(cacheKey, result);
-    
-    return result;
+    return aiResponse;
   } catch (error) {
-    console.error('Error processing question:', error);
-    
-    // Return a fallback response
-    return {
-      aiAnswer: '',
-      aiExplanation: 'Failed to generate explanation',
-      questionDifficulty: 5, // Default middle difficulty
-    };
+    console.error('Error processing question with OpenAI:', error);
+    throw error;
   }
 };
 
