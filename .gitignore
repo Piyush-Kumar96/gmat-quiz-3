@@ -5,7 +5,7 @@ yarn-debug.log
 yarn-error.log
 
 # Environment variables
-.env
+
 .env.local
 .env.development.local
 .env.test.local
@@ -35,7 +35,7 @@ mongo_backup/
 /coverage
 
 # Environment files
-.env
+
 .env.local
 .env.development.local
 .env.test.local
@@ -68,5 +68,6 @@ materials/
 backend/exports/
 backend/materials/
 *.html
+!frontend/public/index.html
 mongo_backup/
 mongo_backup.zip 
