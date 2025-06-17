@@ -33,7 +33,7 @@ const main = async () => {
     console.log('Connected to MongoDB');
     
     // Load the JSON file with extraction results
-    const jsonPath = path.join(process.cwd(), '..', 'exports', 'all_rc_options_extraction_results.json');
+    const jsonPath = path.join(process.cwd(), 'exports', 'all_rc_options_extraction_results.json');
     if (!fs.existsSync(jsonPath)) {
       console.error(`File not found: ${jsonPath}`);
       return;
@@ -92,6 +92,7 @@ const main = async () => {
               console.log(`New question text: ${cleanedQuestionText.substring(0, 100)}...`);
               console.log(`Current options: ${JSON.stringify(question.options || {})}`);
               console.log(`New options: ${JSON.stringify(optionsObjectToUse)}`);
+              console.log(`Adding validationStatus: "fixed_options"`);
               console.log('------------------------');
             } else {
               console.log(`Question ${questionId} not found in database`);
@@ -102,7 +103,8 @@ const main = async () => {
               questionId,
               { 
                 options: optionsObjectToUse,
-                questionText: cleanedQuestionText 
+                questionText: cleanedQuestionText,
+                validationStatus: "fixed_options" 
               }
             );
           }

@@ -92,6 +92,12 @@ export const QuizPage: React.FC = () => {
   // Load quiz questions
   useEffect(() => {
     const loadQuiz = async () => {
+      // Track page view
+      analytics.trackPageView({
+        page_name: 'quiz',
+        path: '/quiz'
+      });
+
       try {
         setLoading(true);
         
@@ -159,6 +165,16 @@ export const QuizPage: React.FC = () => {
         setQuestions(data.questions);
         setTimeLeft(data.timeLimit * 60);
         setQuizId(data.quizId);
+        
+        // Track quiz started
+        analytics.trackQuizStarted({
+          quizId: data.quizId,
+          count: config.count,
+          timeLimit: config.timeLimit,
+          category: config.category,
+          difficulty: config.difficulty?.toString()
+        });
+        
         setLoading(false);
       } catch (err) {
         console.error('Error loading quiz:', err);
@@ -222,10 +238,22 @@ export const QuizPage: React.FC = () => {
   const handleAnswerSelect = (answer: string) => {
     if (currentQuestionIndex < questions.length) {
       const questionId = questions[currentQuestionIndex]._id;
+      const currentQuestion = questions[currentQuestionIndex];
+      
       setAnswers(prev => ({
         ...prev,
         [questionId]: answer
       }));
+      
+      // Track question answered
+      analytics.trackQuestionAnswered({
+        questionId: questionId,
+        correct: false, // We don't know if it's correct yet
+        timeTaken: questionTimeSpent[currentQuestionIndex] || 0,
+        questionType: currentQuestion.type,
+        // category: currentQuestion.category, // Property not available
+        // difficulty: currentQuestion.difficulty // Property not available
+      });
     }
   };
 
@@ -233,11 +261,26 @@ export const QuizPage: React.FC = () => {
   const toggleFlag = () => {
     if (currentQuestionIndex < questions.length) {
       const questionId = questions[currentQuestionIndex]._id;
+      const currentQuestion = questions[currentQuestionIndex];
       
       if (flaggedQuestions.includes(questionId)) {
         setFlaggedQuestions(prev => prev.filter(id => id !== questionId));
       } else if (flaggedQuestions.length < 3) {
         setFlaggedQuestions(prev => [...prev, questionId]);
+        
+        // Track question flagged
+        analytics.trackQuestionFlagged({
+          questionId: questionId,
+          quizId: quizId || undefined,
+          questionType: currentQuestion.type
+        });
+        
+        // Track question flagged
+        analytics.trackQuestionFlagged({
+          questionId: questionId,
+          quizId: quizId || undefined,
+          questionType: currentQuestion.type
+        });
       }
     }
   };
@@ -292,6 +335,15 @@ export const QuizPage: React.FC = () => {
       if (!submission || !submission.results) {
         throw new Error('Invalid response from server');
       }
+      
+      // Track quiz completed
+      analytics.trackQuizCompleted({
+        quizId: quizId,
+        totalCorrect: 0, // We don't know the score yet
+        totalTime: totalTimeSpent,
+        totalQuestions: questions.length,
+        score: Object.keys(answers).length
+      });
       
       setIsSubmitting(false);
       navigate('/results', { state: { submission } });

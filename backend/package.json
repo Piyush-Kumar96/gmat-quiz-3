@@ -4,10 +4,10 @@
   "description": "Backend for GMAT Quiz Platform",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node --max-old-space-size=256 dist/index.js",
-    "dev": "NODE_OPTIONS=--max-old-space-size=256 ts-node-dev --respawn --transpile-only src/index.ts",
+    "start": "node dist/index.js",
+    "dev": "NODE_OPTIONS=--max-old-space-size=2048 ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "create-test-user": "ts-node src/scripts/createTestUser.ts",
     "create-sample-questions": "ts-node src/scripts/createSampleQuestions.ts",
     "create-sample-quiz": "ts-node src/scripts/createSampleQuiz.ts",
@@ -15,7 +15,8 @@
     "extract-with-puppeteer": "ts-node src/scripts/extractWithPuppeteer.ts",
     "extract-with-puppeteer-html": "ts-node src/scripts/extractWithPuppeteer_html.ts",
     "extract-from-links": "ts-node src/scripts/extractQuestionsFromLinks.ts",
-    "validate-questions": "ts-node src/scripts/validateQuestionsWithGPT4.ts"
+    "validate-questions": "ts-node src/scripts/validateQuestionsWithGPT4.ts",
+    "validate-improved": "ts-node src/scripts/validateQuestionsImproved.ts"
   },
   "keywords": [
     "gmat",

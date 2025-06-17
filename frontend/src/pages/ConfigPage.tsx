@@ -115,6 +115,12 @@ export const ConfigPage: React.FC = () => {
 
   // Load available question types and categories
   useEffect(() => {
+    // Track page view
+    analytics.trackPageView({
+      page_name: 'config',
+      path: '/config'
+    });
+    
     const loadFilterOptions = async () => {
       try {
         // In a real implementation, these would be API calls

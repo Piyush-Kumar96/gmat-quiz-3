@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { QuizSubmission } from '../types';
 import { Card, Button, Tag, Divider, Typography, Collapse } from 'antd';
 import QuestionCard from '../components/QuestionCard';
+import { analytics } from '../services/analytics';
 
 const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -11,6 +12,14 @@ export const ResultsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const submission = location.state?.submission as QuizSubmission;
+
+  // Track page view
+  React.useEffect(() => {
+    analytics.trackPageView({
+      page_name: 'results',
+      path: '/results'
+    });
+  }, []);
 
   // Count question types with better detection
   const getQuestionTypeCounts = () => {
