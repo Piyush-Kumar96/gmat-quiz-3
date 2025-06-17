@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { analytics } from '../services/analytics';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -61,7 +62,7 @@ export const Navbar: React.FC = () => {
     return `${baseClasses} ${isActive(path) ? activeClasses : inactiveClasses}`;
   };
 
-  const handleLogout = () => {
+  const handleLogout = () => { analytics.trackUserLoggedOut();
     logout();
     navigate('/login');
   };

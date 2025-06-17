@@ -1,15 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { analytics } from '../services/analytics';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { register, error } = useAuth();
+  const { register, error, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [targetScore, setTargetScore] = useState('700');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Track page view
+  useEffect(() => {
+    analytics.trackPageView({
+      page_name: 'Register Page'
+    });
+  }, []);
+
+  // Track successful registration when user state changes
+  useEffect(() => {
+    if (user && !isLoading) {
+      analytics.trackUserSignedUp({
+        userId: user._id,
+        email: user.email,
+        registrationMethod: 'email'
+      });
+    }
+  }, [user, isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

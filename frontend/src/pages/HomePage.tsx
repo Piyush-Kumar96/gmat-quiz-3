@@ -1,12 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Card } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
+import { analytics } from '../services/analytics';
 
 const { Text } = Typography;
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+
+  // Track page view
+  useEffect(() => {
+    analytics.trackPageView({
+      page_name: 'Home Page'
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

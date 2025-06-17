@@ -36,6 +36,8 @@ import {
   BookOutlined,
   CheckCircleFilled
 } from '@ant-design/icons';
+import { getQuestionTypes, getCategories } from '../services/api';
+import { analytics } from '../services/analytics';
 
 const { Option } = Select;
 const { Title, Text, Paragraph } = Typography;
@@ -179,7 +181,6 @@ export const ConfigPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-6 bg-gray-50 min-h-screen">
       <div className="max-w-4xl mx-auto">
-        <Title level={2} className="text-center mb-8">GMAT Quiz Platform</Title>
         
         {redirectMessage && (
           <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md">

@@ -5,7 +5,7 @@ import { analytics } from '../services/analytics';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, error, user } = useAuth();
+  const { login, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -17,22 +17,19 @@ export const LoginPage: React.FC = () => {
     });
   }, []);
 
-  // Track successful login when user state changes
-  useEffect(() => {
-    if (user && !isLoading) {
-      analytics.trackUserLoggedIn({
-        userId: user._id,
-        loginMethod: 'email'
-      });
-    }
-  }, [user, isLoading]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      await login({ email, password });
+      const user = await login({ email, password });
+      
+      // Track successful login
+      analytics.trackUserLoggedIn({
+        userId: user.id || user._id,
+        loginMethod: 'email'
+      });
+      
       navigate('/');
     } catch (err) {
       // Error is handled by the auth context
