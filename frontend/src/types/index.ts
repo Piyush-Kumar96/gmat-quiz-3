@@ -32,6 +32,19 @@ export interface QuizConfig {
   selectedQuestionTypes?: string[];
   selectedCategories?: string[];
   selectedDifficulties?: string[];
+  
+  // GMAT Focus Edition Configuration
+  isGmatFocus?: boolean;
+  sectionOrder?: GMATSection[];
+  breakAfterSection?: number; // 1 = after first section, 2 = after second section
+  sections?: GMATSectionConfig[];
+  currentSection?: number;
+  totalSections?: number;
+  
+  // Existing options for compatibility
+  isMockTest?: boolean;
+  isSectionalTest?: boolean;
+  sectionName?: string;
 }
 
 export interface QuizResult {
@@ -62,4 +75,25 @@ export interface QuizSubmission {
   timeSpent?: number;
   startTime?: Date;
   endTime?: Date;
+}
+
+export interface GMATSectionConfig {
+  name: GMATSection;
+  questionCount: number;
+  timeLimit: number; // in minutes
+  questionTypes: string[];
+  categories?: string[];
+  completed?: boolean;
+}
+
+export type GMATSection = 'Quantitative Reasoning' | 'Verbal Reasoning' | 'Data Insights';
+
+export interface GMATFocusState {
+  currentSection: number;
+  sectionsCompleted: boolean[];
+  breakTaken: boolean;
+  breakTimeLeft: number; // in seconds (600 = 10 minutes)
+  isOnBreak: boolean;
+  totalTimeSpent: number;
+  sectionTimeSpent: number[];
 } 

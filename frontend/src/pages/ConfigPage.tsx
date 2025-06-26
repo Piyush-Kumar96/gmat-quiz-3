@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { QuizConfig } from '../types';
+import { QuizConfig, GMATSection } from '../types';
 import { 
   Select, 
   InputNumber, 
@@ -8,7 +8,8 @@ import {
   Radio, 
   Tooltip, 
   Alert,
-  Typography
+  Typography,
+  Modal
 } from 'antd';
 import { 
   SettingOutlined, 
@@ -26,11 +27,15 @@ import {
   RocketOutlined,
   TrophyOutlined,
   BulbOutlined,
-  PieChartOutlined
+  PieChartOutlined,
+  CalculatorOutlined,
+  CoffeeOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import { analytics } from '../services/analytics';
 import { useRoleAccess } from '../hooks/useRoleAccess';
 import FeatureLock from '../components/FeatureLock';
+import GMATFocusConfig from '../components/GMATFocusConfig';
 
 const { Option } = Select;
 const { Text, Title } = Typography;
@@ -56,7 +61,11 @@ export const ConfigPage: React.FC = () => {
   const [questionTypes, setQuestionTypes] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sectionOrder, setSectionOrder] = useState<GMATSection[]>(['Quantitative Reasoning', 'Verbal Reasoning', 'Data Insights']);
+  const [breakAfterSection, setBreakAfterSection] = useState(0);
   const redirectMessage = location.state?.message;
+
+  const availableSections: GMATSection[] = ['Quantitative Reasoning', 'Verbal Reasoning', 'Data Insights'];
 
   // Load available question types and categories
   useEffect(() => {
@@ -169,6 +178,73 @@ export const ConfigPage: React.FC = () => {
     navigate('/quiz', { state: { config: sectionConfig }});
   };
 
+  const handleGMATFocusMockTest = (sectionOrder: GMATSection[], breakAfterSection: number) => {
+    // Check if user can access mock tests
+    if (!canAccessFeature('mock_test')) {
+      return;
+    }
+    
+    setLoading(true);
+    
+    // For now, start with the first section in the order
+    const firstSection = sectionOrder[0];
+    let sectionConfig;
+    
+    if (firstSection === 'Quantitative Reasoning') {
+      sectionConfig = {
+        count: 21,
+        timeLimit: 45,
+        questionTypeMode: 'specific',
+        selectedQuestionTypes: ['Problem Solving'],
+        difficultyMode: 'mixed',
+        categoryMode: 'specific',
+        selectedCategories: ['Quantitative Reasoning'],
+        isGmatFocus: true,
+        sectionOrder,
+        breakAfterSection,
+        currentSection: 0,
+        totalSections: 3,
+        isMockTest: true,
+        sectionName: 'GMAT Focus: Quantitative Reasoning'
+      };
+    } else if (firstSection === 'Verbal Reasoning') {
+      sectionConfig = {
+        count: 23,
+        timeLimit: 45,
+        questionTypeMode: 'specific',
+        selectedQuestionTypes: ['Reading Comprehension', 'Critical Reasoning'],
+        difficultyMode: 'mixed',
+        categoryMode: 'specific',
+        selectedCategories: ['Verbal Reasoning'],
+        isGmatFocus: true,
+        sectionOrder,
+        breakAfterSection,
+        currentSection: 0,
+        totalSections: 3,
+        isMockTest: true,
+        sectionName: 'GMAT Focus: Verbal Reasoning'
+      };
+    } else { // Data Insights
+      sectionConfig = {
+        count: 20,
+        timeLimit: 45,
+        questionTypeMode: 'specific',
+        selectedQuestionTypes: ['Data Sufficiency'],
+        difficultyMode: 'mixed',
+        categoryMode: 'mixed', // Allow all categories for data insights
+        isGmatFocus: true,
+        sectionOrder,
+        breakAfterSection,
+        currentSection: 0,
+        totalSections: 3,
+        isMockTest: true,
+        sectionName: 'GMAT Focus: Data Insights'
+      };
+    }
+    
+    navigate('/quiz', { state: { config: sectionConfig }});
+  };
+
   // Show feature lock for guests
   if (isGuest) {
     return (
@@ -247,68 +323,191 @@ export const ConfigPage: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               
-              {/* Full Mock Test */}
+              {/* GMAT Focus Edition Mock Test - Dedicated Card */}
               {canAccessFeature('mock_test') ? (
-                <div className="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-all duration-300 border-t-4 border-purple-500">
-                  <div className="text-center">
-                    <div className="mb-6">
-                       <BookOutlined className="text-5xl text-purple-500 mb-4" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                       <Title level={2} className="text-2xl font-semibold text-gray-800 mb-2">
-                         Full Mock Test
-                       </Title>
-                       <Text className="text-gray-600">
-                         Complete GMAT Focus experience with all sections
-                       </Text>
-                     </div>
-                     <div className="mb-8 space-y-4">
-                       <div className="flex items-center justify-center text-gray-600">
-                         <CheckCircleFilled className="text-green-500 mr-3 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                         <span className="text-lg">35 Questions</span>
-                       </div>
-                       <div className="flex items-center justify-center text-gray-600">
-                         <CheckCircleFilled className="text-green-500 mr-3 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                         <span className="text-lg">65 Minutes</span>
-                       </div>
-                       <div className="flex items-center justify-center text-gray-600">
-                         <CheckCircleFilled className="text-green-500 mr-3 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                         <span className="text-lg">Balanced Question Mix</span>
-                       </div>
-                       <div className="flex items-center justify-center text-gray-600">
-                         <CheckCircleFilled className="text-green-500 mr-3 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                         <span className="text-lg">Real Exam Experience</span>
-                       </div>
+                <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 border border-purple-200">
+                  {/* Header */}
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <RocketOutlined className="text-3xl text-white" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
                     </div>
-                    <button
-                      onClick={handleMockTest}
-                      className={`w-full py-4 font-semibold text-lg rounded-lg transition-all duration-300 shadow-md hover:shadow-lg ${
-                        hasReachedMockTestLimit 
-                          ? 'bg-gray-400 text-white cursor-not-allowed' 
-                          : 'bg-purple-600 hover:bg-purple-700 text-white'
-                      }`}
-                      disabled={hasReachedMockTestLimit || loading}
+                    <Title level={2} className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                      GMAT Focus Edition
+                    </Title>
+                    <Text className="text-lg text-gray-600 mb-2">
+                      Official 3-section format • Complete testing experience
+                    </Text>
+                    <Text className="text-sm text-gray-500">
+                      64 questions across Quantitative (21q), Verbal (23q), and Data Insights (20q) • 2h 15m total
+                    </Text>
+                  </div>
+
+                  {/* Section Order Selection */}
+                  <div className="mb-6">
+                    <div className="flex items-center mb-4">
+                      <SwapOutlined className="mr-2 text-purple-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                      <Text className="font-semibold text-gray-800">Choose your section order</Text>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((position) => (
+                        <div key={position} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-sm font-bold text-white">{position}</span>
+                            </div>
+                            <div className="flex-1">
+                              <Text className="text-sm text-gray-600 mb-2">
+                                {position === 1 ? 'First Section' : position === 2 ? 'Second Section' : 'Third Section'}
+                              </Text>
+                              <Select
+                                placeholder="Choose section"
+                                className="w-full"
+                                size="large"
+                                value={sectionOrder[position - 1]}
+                                onChange={(value) => {
+                                  const newOrder = [...sectionOrder];
+                                  newOrder[position - 1] = value;
+                                  setSectionOrder(newOrder);
+                                }}
+                                dropdownStyle={{ zIndex: 1050 }}
+                              >
+                                {availableSections
+                                  .filter(section => !sectionOrder.includes(section) || section === sectionOrder[position - 1])
+                                  .map(section => (
+                                  <Option key={section} value={section}>
+                                    <div className="flex items-center py-2">
+                                      {section === 'Quantitative Reasoning' && (
+                                        <>
+                                          <CalculatorOutlined className="mr-3 text-blue-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                          <div>
+                                            <div className="font-semibold text-gray-800">Quantitative Reasoning</div>
+                                            <div className="text-xs text-gray-500">21 questions • 45 minutes • Problem Solving</div>
+                                          </div>
+                                        </>
+                                      )}
+                                      {section === 'Verbal Reasoning' && (
+                                        <>
+                                          <FileTextOutlined className="mr-3 text-green-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                          <div>
+                                            <div className="font-semibold text-gray-800">Verbal Reasoning</div>
+                                            <div className="text-xs text-gray-500">23 questions • 45 minutes • Reading & Critical Reasoning</div>
+                                          </div>
+                                        </>
+                                      )}
+                                      {section === 'Data Insights' && (
+                                        <>
+                                          <BarChartOutlined className="mr-3 text-orange-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                          <div>
+                                            <div className="font-semibold text-gray-800">Data Insights</div>
+                                            <div className="text-xs text-gray-500">20 questions • 45 minutes • Data Sufficiency & Analysis</div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </Option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Break Configuration - Right after section order */}
+                  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 mb-6">
+                    <div className="flex items-center mb-3">
+                      <CoffeeOutlined className="mr-2 text-orange-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                      <Text className="font-semibold text-gray-800">Optional 10-minute break</Text>
+                    </div>
+                    <Select
+                      className="w-full"
+                      size="large"
+                      value={breakAfterSection}
+                      onChange={setBreakAfterSection}
+                      placeholder="Choose when to take your break"
                     >
-                      {loading ? 'Starting...' : hasReachedMockTestLimit ? 'Limit Reached' : 'Start Mock Test'}
-                    </button>
-                    {hasReachedMockTestLimit && (
-                      <Text type="secondary" className="block mt-3 text-sm">
-                        {getUpgradeMessage('mock_test')}
+                      <Option value={0}>
+                        <div className="flex items-center py-1">
+                          <ClockCircleOutlined className="mr-3 text-gray-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                          <div>
+                            <div className="font-medium text-gray-800">No break</div>
+                            <div className="text-xs text-gray-500">Complete all sections continuously</div>
+                          </div>
+                        </div>
+                      </Option>
+                      <Option value={1}>
+                        <div className="flex items-center py-1">
+                          <CoffeeOutlined className="mr-3 text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                          <div>
+                            <div className="font-medium text-gray-800">After 1st section</div>
+                            <div className="text-xs text-gray-500">Take break after completing your first section</div>
+                          </div>
+                        </div>
+                      </Option>
+                      <Option value={2}>
+                        <div className="flex items-center py-1">
+                          <CoffeeOutlined className="mr-3 text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                          <div>
+                            <div className="font-medium text-gray-800">After 2nd section</div>
+                            <div className="text-xs text-gray-500">Take break after completing your second section</div>
+                          </div>
+                        </div>
+                      </Option>
+                    </Select>
+                    
+                    <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                      <Text className="text-xs text-blue-700 flex items-center">
+                        <span className="mr-1">💡</span>
+                        You can end your break early and continue whenever you're ready
                       </Text>
-                    )}
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <div className="text-center">
+                    <Button
+                      type="primary"
+                      size="large"
+                      onClick={() => handleGMATFocusMockTest(sectionOrder, breakAfterSection)}
+                      disabled={loading || sectionOrder.length !== 3 || sectionOrder.includes(undefined as any)}
+                      className="w-full h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                      style={{ color: 'white' }}
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center text-white">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                          Starting GMAT Focus Edition...
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center text-white">
+                          <PlayCircleOutlined className="mr-3 text-xl" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                          Start GMAT Focus Edition Test
+                        </span>
+                      )}
+                    </Button>
+                    
+                    <Text className="block mt-3 text-sm text-gray-500">
+                      Complete authentic GMAT Focus experience with customizable section order
+                    </Text>
                   </div>
                 </div>
               ) : (
                 <FeatureLock
                   feature="mock_test"
-                  title="Mock Test Access Required"
-                  description="Take a full-length GMAT practice test"
+                  title="GMAT Focus Edition"
+                  description="Access the official GMAT Focus Edition mock test with customizable section order"
                 >
                   <div className="bg-white rounded-lg shadow-md p-8 border-t-4 border-gray-300 opacity-60">
                     <div className="text-center">
-                      <BookOutlined className="text-5xl text-gray-400 mb-4" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                      <Title level={2} className="text-2xl font-semibold text-gray-500 mb-4">
-                        Full Mock Test
+                      <RocketOutlined className="text-6xl text-gray-400 mb-4" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                      <Title level={3} className="text-gray-500 mb-2">
+                        GMAT Focus Edition
                       </Title>
-                      <Text className="text-gray-500">Upgrade to access</Text>
+                      <Text className="text-gray-500">
+                        Upgrade to access the official GMAT Focus Edition mock test
+                      </Text>
                     </div>
                   </div>
                 </FeatureLock>
@@ -382,14 +581,37 @@ export const ConfigPage: React.FC = () => {
                         <FileTextOutlined className="text-2xl text-green-500 mr-4" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
                         <div>
                           <Title level={4} className="text-lg font-semibold text-gray-800 mb-1">
-                            Verbal
+                            Verbal Reasoning
                           </Title>
                           <div className="text-sm text-gray-600">23 Questions • 45 Minutes</div>
-                          <div className="text-xs text-green-600 font-medium">✓ Reading & Critical Reasoning</div>
+                          <div className="text-xs text-green-600 font-medium">✓ Reading Comprehension & Critical Reasoning</div>
                         </div>
                       </div>
                       <button
                         className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium text-sm rounded-md transition-colors"
+                        disabled={loading}
+                      >
+                        Start
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Traditional Mix Bag */}
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-200"
+                       onClick={handleMockTest}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <TrophyOutlined className="text-2xl text-gray-500 mr-4" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                        <div>
+                          <Title level={4} className="text-lg font-semibold text-gray-800 mb-1">
+                            Mix Bag (Traditional)
+                          </Title>
+                          <div className="text-sm text-gray-600">35 Questions • 65 Minutes</div>
+                          <div className="text-xs text-green-600 font-medium">✓ Balanced mix from all GMAT areas</div>
+                        </div>
+                      </div>
+                      <button
+                        className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium text-sm rounded-md transition-colors"
                         disabled={loading}
                       >
                         Start

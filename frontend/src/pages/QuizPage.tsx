@@ -329,6 +329,105 @@ export const QuizPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       console.log('Submitting quiz answers:', { quizId, answers, timeSpent: totalTimeSpent });
+      
+      // Handle GMAT Focus section completion
+      if (config.isGmatFocus && config.sectionOrder && config.currentSection !== undefined) {
+        const currentSectionIndex = config.currentSection;
+        const nextSectionIndex = currentSectionIndex + 1;
+        
+        // If there are more sections to complete
+        if (nextSectionIndex < (config.totalSections || 3)) {
+          const nextSectionName = config.sectionOrder[nextSectionIndex];
+          
+          // Store current section results (simplified for now)
+          const sectionResults = {
+            sectionIndex: currentSectionIndex,
+            sectionName: config.sectionName,
+            answers: answers,
+            timeSpent: totalTimeSpent,
+            questionCount: questions.length
+          };
+          
+          // Check if break should be offered
+          if (config.breakAfterSection === nextSectionIndex) {
+            // Navigate to break screen (for now, just show alert)
+            const takeBreak = window.confirm(
+              `Section ${currentSectionIndex + 1} completed! Would you like to take a 10-minute break before starting ${nextSectionName}?`
+            );
+            
+            if (takeBreak) {
+              alert('Break feature coming soon! For now, continuing to next section.');
+            }
+          }
+          
+          // Navigate to next section
+          let nextSectionConfig;
+          
+          if (nextSectionName === 'Quantitative Reasoning') {
+            nextSectionConfig = {
+              count: 21,
+              timeLimit: 45,
+              questionTypeMode: 'specific',
+              selectedQuestionTypes: ['Problem Solving'],
+              difficultyMode: 'mixed',
+              categoryMode: 'specific',
+              selectedCategories: ['Quantitative Reasoning'],
+              isGmatFocus: true,
+              sectionOrder: config.sectionOrder,
+              breakAfterSection: config.breakAfterSection,
+              currentSection: nextSectionIndex,
+              totalSections: config.totalSections,
+              isMockTest: true,
+              sectionName: 'GMAT Focus: Quantitative Reasoning'
+            };
+          } else if (nextSectionName === 'Verbal Reasoning') {
+            nextSectionConfig = {
+              count: 23,
+              timeLimit: 45,
+              questionTypeMode: 'specific',
+              selectedQuestionTypes: ['Reading Comprehension', 'Critical Reasoning'],
+              difficultyMode: 'mixed',
+              categoryMode: 'specific',
+              selectedCategories: ['Verbal Reasoning'],
+              isGmatFocus: true,
+              sectionOrder: config.sectionOrder,
+              breakAfterSection: config.breakAfterSection,
+              currentSection: nextSectionIndex,
+              totalSections: config.totalSections,
+              isMockTest: true,
+              sectionName: 'GMAT Focus: Verbal Reasoning'
+            };
+          } else { // Data Insights
+            nextSectionConfig = {
+              count: 20,
+              timeLimit: 45,
+              questionTypeMode: 'specific',
+              selectedQuestionTypes: ['Data Sufficiency'],
+              difficultyMode: 'mixed',
+              categoryMode: 'mixed',
+              isGmatFocus: true,
+              sectionOrder: config.sectionOrder,
+              breakAfterSection: config.breakAfterSection,
+              currentSection: nextSectionIndex,
+              totalSections: config.totalSections,
+              isMockTest: true,
+              sectionName: 'GMAT Focus: Data Insights'
+            };
+          }
+          
+          // Navigate to next section
+          setIsSubmitting(false);
+          navigate('/quiz', { 
+            state: { 
+              config: nextSectionConfig,
+              previousSectionResults: sectionResults
+            }
+          });
+          return;
+        }
+      }
+      
+      // Regular quiz submission or final GMAT Focus section
       const submission = await submitQuiz(quizId, answers, totalTimeSpent);
       console.log('Received submission response:', submission);
       
@@ -346,7 +445,17 @@ export const QuizPage: React.FC = () => {
       });
       
       setIsSubmitting(false);
-      navigate('/results', { state: { submission } });
+      navigate('/results', { 
+        state: { 
+          submission,
+          isGmatFocus: config.isGmatFocus,
+          sectionData: config.isGmatFocus ? {
+            currentSection: config.currentSection,
+            totalSections: config.totalSections,
+            sectionOrder: config.sectionOrder
+          } : undefined
+        } 
+      });
     } catch (err) {
       console.error('Error submitting quiz:', err);
       setIsSubmitting(false);
@@ -409,8 +518,28 @@ export const QuizPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header with timer and pause button - now sticky */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6 sticky top-0 z-40">
+        {/* GMAT Focus Section Header */}
+        {config.isGmatFocus && (
+          <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-purple-800">GMAT Focus Edition Mock Test</h2>
+                <p className="text-sm text-purple-600">
+                  {config.sectionName} • Section {(config.currentSection || 0) + 1} of {config.totalSections || 3}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-purple-600">Section Order:</div>
+                <div className="text-xs font-medium text-purple-700">
+                  {config.sectionOrder?.join(' → ') || 'Quant → Verbal → Data Insights'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">GMAT Quiz</h1>
+          <h1 className="text-2xl font-bold">{config.isGmatFocus ? config.sectionName : 'GMAT Quiz'}</h1>
           <div className="flex items-center gap-4">
             {/* Per-question timer */}
             <div className="flex items-center bg-gray-100 px-4 py-2 rounded-lg">
