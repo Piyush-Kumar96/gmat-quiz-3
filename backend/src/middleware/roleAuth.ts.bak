@@ -1,0 +1,104 @@
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { User, UserRole } from '../models/User';
+
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    role: UserRole;
+    email: string;
+  };
+}
+
+// Middleware to verify JWT token and extract user info
+export const authenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Access token required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    
+    // Fetch user to get current role (in case it was updated)
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    req.user = {
+      id: user._id.toString(),
+      role: user.role,
+      email: user.email
+    };
+
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Middleware to check if user has required role
+export const requireRole = (allowedRoles: UserRole[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        message: 'Insufficient permissions',
+        requiredRoles: allowedRoles,
+        userRole: req.user.role
+      });
+    }
+
+    next();
+  };
+};
+
+// Middleware to check if user is paid user
+export const requirePaidUser = requireRole(['monthly_pack', 'quarterly_pack', 'annual_pack', 'admin']);
+
+// Middleware to check if user is admin
+export const requireAdmin = requireRole(['admin']);
+
+// Middleware to check if user has access to premium features
+export const requirePremiumAccess = requireRole(['monthly_pack', 'quarterly_pack', 'annual_pack', 'admin']);
+
+// Middleware to check mock test limits
+export const checkMockTestLimit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user has unlimited access
+    if (user.maxMockTests === -1) {
+      return next();
+    }
+
+    // Check if user has exceeded their limit
+    if (user.mockTestsUsed >= user.maxMockTests) {
+      return res.status(403).json({ 
+        message: 'Mock test limit exceeded',
+        used: user.mockTestsUsed,
+        limit: user.maxMockTests,
+        upgradeRequired: user.role === 'registered'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Mock test limit check error:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}; 

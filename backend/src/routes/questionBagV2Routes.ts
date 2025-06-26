@@ -1,6 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import { QuestionBagV2 } from '../models/QuestionBagV2';
+import { User } from '../models/User';
+import { authenticateToken, requirePaidUser, checkMockTestLimit, AuthRequest } from '../middleware/roleAuth';
 
 const router = express.Router();
 
@@ -19,8 +21,8 @@ const transformQuestionForFrontend = (question: any) => {
   return transformedQuestion;
 };
 
-// Get all questions with pagination
-router.get('/', async (req, res) => {
+// Get all questions with pagination - Admin only
+router.get('/', authenticateToken, requirePaidUser, async (req: AuthRequest, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -58,13 +60,14 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get random questions for a quiz
-router.post('/random', async (req, res) => {
+// Get random questions for a quiz - Role-based access control
+router.post('/random', authenticateToken, checkMockTestLimit, async (req: AuthRequest, res) => {
   try {
     const { count = 20, timeLimit = 30, filters = {} } = req.body;
     
     console.log('----------------------------------------------');
     console.log('Fetching random questions with filter config:', JSON.stringify(filters, null, 2));
+    console.log(`User: ${req.user?.email} (${req.user?.role}) - Mock tests used: ${req.user?.mockTestsUsed}/${req.user?.mockTestLimit}`);
     
     // Create a filter object based on provided filters
     const filter: any = {};
@@ -179,53 +182,55 @@ router.post('/random', async (req, res) => {
       
       console.log('RC Filter:', rcFilter);
       
-      // Find RC passage groups
-      const rcGroups = await QuestionBagV2.aggregate([
-        { $match: rcFilter },
-        { $group: { _id: '$rcNumber', count: { $sum: 1 }, questions: { $push: '$$ROOT' } } },
-        { $match: { count: { $gte: 3 } } }, // Only passages with at least 3 questions
-        { $sample: { size: maxRCPassages } } // Select a limited number of RC passages
-      ]);
+      // Find all RC questions and group by passage (rcNumber)
+      const rcQuestions = await QuestionBagV2.find(rcFilter);
       
-      console.log(`Found ${rcGroups.length} RC passages with at least 3 questions`);
+      console.log(`Found ${rcQuestions.length} RC questions across different passages`);
       
-      // Keep track of added RC questions
+      // Group by rcNumber (passage)
+      const rcPassageGroups = new Map();
+      rcQuestions.forEach(q => {
+        const passageId = q.rcNumber || 'unknown';
+        if (!rcPassageGroups.has(passageId)) {
+          rcPassageGroups.set(passageId, []);
+        }
+        rcPassageGroups.get(passageId).push(q);
+      });
+      
+      console.log(`RC questions grouped into ${rcPassageGroups.size} passages`);
+      
+      // Sort passages by question count (descending) to pick passages with more questions
+      const sortedPassages = Array.from(rcPassageGroups.entries())
+        .sort(([, questionsA], [, questionsB]) => questionsB.length - questionsA.length);
+      
       let rcQuestionsAdded = 0;
       
-      // Add questions from each RC passage, up to our limit
-      for (const group of rcGroups) {
-        // If we've reached our RC question limit, break
+      // Add questions from each passage until we reach our limit
+      for (const [passageId, questions] of sortedPassages) {
         if (rcQuestionsAdded >= maxRCQuestions) break;
+        if (finalQuestions.length >= count) break;
         
-        // Filter out incomplete questions from this passage group
-        const validQuestions = group.questions.filter((q: any) => 
-          q.questionText && 
-          q.options && 
-          Object.keys(q.options).length > 0 && 
-          q.correctAnswer
-        );
+        // Sort questions within the passage by some criteria (e.g., difficulty, creation date)
+        const sortedQuestions = questions.sort((a: any, b: any) => {
+          // Prefer questions with higher difficulty if available
+          if (a.difficulty && b.difficulty) {
+            return b.difficulty - a.difficulty;
+          }
+          // Otherwise sort by creation date (newest first)
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
         
-        if (validQuestions.length < 3) {
-          console.log(`Skipping RC passage ${group._id} - insufficient valid questions`);
-          continue; // Skip this passage if it doesn't have enough valid questions
-        }
-        
-        // Take up to 5 questions from this passage, but don't exceed our RC question limit
+        // Take questions from this passage, but don't exceed our limits
         const questionsToTake = Math.min(
-          5, // Maximum 5 questions per passage
-          validQuestions.length,
-          maxRCQuestions - rcQuestionsAdded // Don't exceed our RC question limit
+          sortedQuestions.length,
+          maxRCQuestions - rcQuestionsAdded,
+          count - finalQuestions.length
         );
         
-        // Sort by question number if available
-        const sortedQuestions = validQuestions
-          .sort((a: any, b: any) => (a.questionNumber || 0) - (b.questionNumber || 0))
-          .slice(0, questionsToTake);
+        finalQuestions.push(...sortedQuestions.slice(0, questionsToTake));
+        rcQuestionsAdded += questionsToTake;
         
-        finalQuestions = [...finalQuestions, ...sortedQuestions];
-        rcQuestionsAdded += sortedQuestions.length;
-        
-        console.log(`Added ${sortedQuestions.length} questions from RC passage ${group._id}`);
+        console.log(`Added ${sortedQuestions.length} questions from RC passage ${passageId}`);
       }
       
       console.log(`Total RC questions added: ${rcQuestionsAdded}`);
@@ -246,6 +251,13 @@ router.post('/random', async (req, res) => {
         // Generate a unique quiz ID
         const quizId = new mongoose.Types.ObjectId().toString();
         
+        // Update user's mock test count for non-unlimited users
+        if (req.user && req.user.mockTestLimit !== -1) {
+          await User.findByIdAndUpdate(req.user.userId, {
+            $inc: { mockTestsUsed: 1 }
+          });
+        }
+        
         return res.json({
           quizId,
           questions: transformedQuestions,
@@ -258,171 +270,93 @@ router.post('/random', async (req, res) => {
     const remainingCount = count - finalQuestions.length;
     
     if (remainingCount > 0) {
-      // If user specified specific question types, prioritize those
+      // Define the question types we want to fetch (excluding RC if already handled)
+      let typesToFetch: string[] = [];
+      
       if (requestedTypes.length > 0) {
-        // For question types selection, get the required number
-        const specificTypesFilter = {
-          ...filter,
+        // User specified specific types
+        typesToFetch = requestedTypes.filter(type => type !== 'Reading Comprehension');
+      } else {
+        // Use default distribution
+        typesToFetch = ['Critical Reasoning', 'Data Sufficiency', 'Problem Solving'];
+      }
+      
+      console.log(`Fetching ${remainingCount} more questions for types: ${typesToFetch.join(', ')}`);
+      
+      // For each question type, fetch questions according to distribution
+      for (const qType of typesToFetch) {
+        if (finalQuestions.length >= count) break;
+        
+        // Calculate how many questions of this type we need
+        let questionsNeeded: number;
+        if (requestedTypes.length > 0) {
+          // If specific types requested, distribute evenly among remaining types
+          questionsNeeded = Math.ceil(remainingCount / typesToFetch.length);
+        } else {
+          // Use distribution percentages
+          const distribution = questionTypeDistribution?.[qType] || 0;
+          questionsNeeded = Math.min(distribution, count - finalQuestions.length);
+        }
+        
+        if (questionsNeeded <= 0) continue;
+        
+        // Create filter for this question type
+        const typeFilter: any = {
+          questionType: qType,
           ...validQuestionFilter,
+          _id: { $nin: finalQuestions.map((q: any) => q._id) } // Exclude already selected questions
         };
         
-        // Exclude already added RC questions
-        if (finalQuestions.length > 0) {
-          specificTypesFilter._id = { $nin: finalQuestions.map((q: any) => q._id) };
+        // Add type-specific validation
+        if (typeSpecificFilters[qType as keyof typeof typeSpecificFilters]) {
+          Object.assign(typeFilter, typeSpecificFilters[qType as keyof typeof typeSpecificFilters]);
         }
-
-        // Filter out RC from the requested types if we've already handled it
-        const remainingTypes = requestedTypes.filter(type => 
-          !finalQuestions.some(q => q.questionType === type)
-        );
         
-        console.log(`Remaining types to fetch: ${remainingTypes.join(', ')}`);
+        // Apply user's filter preferences
+        if (filter.category) typeFilter.category = filter.category;
+        if (filter.difficulty) typeFilter.difficulty = filter.difficulty;
         
-        // Only proceed if we have question types to search for
-        if (remainingTypes.length > 0) {
-          // Create an array to hold questions of different types
-          const typedQuestions: any[] = [];
-          
-          // For each requested type, apply the appropriate type-specific filter
-          for (const questionType of remainingTypes) {
-            const typeFilter = {
-              ...specificTypesFilter,
-              questionType,
-              ...(typeSpecificFilters[questionType] || {})
-            };
-            
-            console.log(`Fetching ${questionType} questions with filter:`, typeFilter);
-            
-            // Fetch questions for this type
-            const questionsOfType = await QuestionBagV2.aggregate([
-              { $match: typeFilter },
-              { $sample: { size: Math.ceil(remainingCount / remainingTypes.length) } }
-            ]);
-            
-            console.log(`Added ${questionsOfType.length} ${questionType} questions`);
-            typedQuestions.push(...questionsOfType);
-          }
-          
-          // Add all typed questions to final questions
-          finalQuestions = [...finalQuestions, ...typedQuestions];
-        }
-      } 
-      // Otherwise, distribute according to our balanced mix
-      else if (questionTypeDistribution) {
-        // Calculate how many of each type we still need
-        const crTarget = questionTypeDistribution['Critical Reasoning'];
-        const dsTarget = questionTypeDistribution['Data Sufficiency'];
-        const psTarget = questionTypeDistribution['Problem Solving'];
+        console.log(`Fetching ${questionsNeeded} ${qType} questions with filter:`, typeFilter);
         
-        // Create a base filter for non-RC questions
-        const baseFilter = {
-          ...filter,
-          ...validQuestionFilter,
-          _id: { $nin: finalQuestions.map((q: any) => q._id) }
-        };
-        
-        // Get Critical Reasoning questions
-        if (crTarget > 0 && finalQuestions.length < count) {
-          const crFilter = {
-            ...baseFilter,
-            questionType: 'Critical Reasoning',
-            ...typeSpecificFilters['Critical Reasoning']
-          };
-          
-          const crQuestions = await QuestionBagV2.aggregate([
-            { $match: crFilter },
-            { $sample: { size: Math.min(crTarget, count - finalQuestions.length) } }
+        try {
+          const typeQuestions = await QuestionBagV2.aggregate([
+            { $match: typeFilter },
+            { $sample: { size: questionsNeeded } }
           ]);
           
-          console.log(`Added ${crQuestions.length} Critical Reasoning questions`);
-          finalQuestions = [...finalQuestions, ...crQuestions];
-        }
-        
-        // Get Data Sufficiency questions
-        if (dsTarget > 0 && finalQuestions.length < count) {
-          const dsFilter = {
-            ...baseFilter,
-            questionType: 'Data Sufficiency',
-            ...typeSpecificFilters['Data Sufficiency']
-          };
-          
-          const dsQuestions = await QuestionBagV2.aggregate([
-            { $match: dsFilter },
-            { $sample: { size: Math.min(dsTarget, count - finalQuestions.length) } }
-          ]);
-          
-          console.log(`Added ${dsQuestions.length} Data Sufficiency questions`);
-          finalQuestions = [...finalQuestions, ...dsQuestions];
-        }
-        
-        // Get Problem Solving questions
-        if (psTarget > 0 && finalQuestions.length < count) {
-          const psFilter = {
-            ...baseFilter,
-            questionType: 'Problem Solving',
-            ...typeSpecificFilters['Problem Solving']
-          };
-          
-          const psQuestions = await QuestionBagV2.aggregate([
-            { $match: psFilter },
-            { $sample: { size: Math.min(psTarget, count - finalQuestions.length) } }
-          ]);
-          
-          console.log(`Added ${psQuestions.length} Problem Solving questions`);
-          finalQuestions = [...finalQuestions, ...psQuestions];
+          console.log(`Added ${typeQuestions.length} ${qType} questions`);
+          finalQuestions.push(...typeQuestions);
+        } catch (error) {
+          console.error(`Error fetching ${qType} questions:`, error);
         }
       }
       
-      // If we still don't have enough questions, fill with any valid questions
+      // Step 3: If we still don't have enough questions, try fallback queries
       if (finalQuestions.length < count) {
         console.log(`Still need ${count - finalQuestions.length} more questions. Using fallback query.`);
         
-        // Get the types we already have in our quiz
-        const existingTypes = new Set(finalQuestions.map((q: any) => q.questionType));
-        
-        // Prepare a list of question types to try, based on what's requested
-        let typesToTry: string[] = [];
-        
-        // If specific types were requested, prioritize those
-        if (requestedTypes.length > 0) {
-          typesToTry = [...requestedTypes];
-        } 
-        // Otherwise use all types except Reading Comprehension unless specifically requested
-        else {
-          typesToTry = ['Problem Solving', 'Data Sufficiency', 'Critical Reasoning'];
+        // Try each question type again with more relaxed filters
+        for (const qType of typesToFetch) {
+          if (finalQuestions.length >= count) break;
           
-          // Only include RC if explicitly requested or if we've already added some RC questions
-          if (shouldHandleRC || existingTypes.has('Reading Comprehension')) {
-            typesToTry.push('Reading Comprehension');
-          }
-        }
-        
-        // Create an array to hold our fallback questions
-        const fallbackQuestions: any[] = [];
-        
-        // Try to fetch questions of each remaining type
-        for (const questionType of typesToTry) {
-          if (finalQuestions.length + fallbackQuestions.length >= count) break;
-          
-          const typeFilter = {
-            ...filter,
-            ...validQuestionFilter,
-            questionType,
-            ...(typeSpecificFilters[questionType] || {}),
-            _id: { $nin: [...finalQuestions.map((q: any) => q._id), ...fallbackQuestions.map((q: any) => q._id)] }
+          const fallbackFilter: any = {
+            questionType: qType,
+            questionText: { $exists: true, $ne: '' },
+            _id: { $nin: finalQuestions.map((q: any) => q._id) }
           };
           
-          const questionsOfType = await QuestionBagV2.aggregate([
-            { $match: typeFilter },
-            { $sample: { size: Math.ceil((count - finalQuestions.length - fallbackQuestions.length) / typesToTry.length) } }
+          // Apply user's category and difficulty preferences if specified
+          if (filter.category) fallbackFilter.category = filter.category;
+          if (filter.difficulty) fallbackFilter.difficulty = filter.difficulty;
+          
+          const fallbackQuestions = await QuestionBagV2.aggregate([
+            { $match: fallbackFilter },
+            { $sample: { size: count - finalQuestions.length } }
           ]);
           
-          console.log(`Added ${questionsOfType.length} ${questionType} questions as fallback`);
-          fallbackQuestions.push(...questionsOfType);
+          console.log(`Added ${fallbackQuestions.length} ${qType} questions as fallback`);
+          finalQuestions.push(...fallbackQuestions);
         }
-        
-        // Add all fallback questions to final questions
-        finalQuestions = [...finalQuestions, ...fallbackQuestions];
         
         // Last resort - if we still don't have enough, try again with minimal requirements
         if (finalQuestions.length < count) {
@@ -523,44 +457,16 @@ router.post('/random', async (req, res) => {
     console.log('----------------------------------------------');
     console.log(`Quiz configuration - Requested filters:`, JSON.stringify(filters, null, 2));
     console.log(`MongoDB filter used:`, JSON.stringify(filter, null, 2));
-
-    // Count questions missing key fields by type
-    const invalidQuestions = finalQuestions.filter((q: any) => {
-      const questionType = q.questionType;
-      
-      // Check base requirements
-      if (!q.questionText || !q.correctAnswer || !q.options || Object.keys(q.options).length === 0) {
-        return true;
-      }
-      
-      // Check type-specific requirements
-      if (questionType === 'Reading Comprehension' && (!q.passageText || !q.rcNumber)) {
-        return true;
-      }
-      if (questionType === 'Critical Reasoning' && !q.passageText) {
-        return true;
-      }
-      if (questionType === 'Data Sufficiency') {
-        // Check if statements exist either in metadata or in question text
-        const hasMetadataStatements = q.metadata && 
-          q.metadata.statement1 && 
-          q.metadata.statement2;
-        
-        const hasStatementsInQuestion = q.questionText.match(/\(1\).*\(2\)/);
-        
-        if (!hasMetadataStatements && !hasStatementsInQuestion) {
-          return true;
-        }
-      }
-      
-      return false;
-    });
-
-    if (invalidQuestions.length > 0) {
-      console.log(`Warning: ${invalidQuestions.length} questions may have missing required fields:`);
-      invalidQuestions.forEach((q: any) => {
-        console.log(`- ${q._id}: ${q.questionType} question is missing required fields`);
+    console.log(`Created quiz with ${transformedQuestions.length} questions.`);
+    console.log(`Question type distribution: ${JSON.stringify(questionCounts)}`);
+    console.log('----------------------------------------------');
+    
+    // Update user's mock test count for non-unlimited users
+    if (req.user && req.user.mockTestLimit !== -1) {
+      await User.findByIdAndUpdate(req.user.userId, {
+        $inc: { mockTestsUsed: 1 }
       });
+      console.log(`Updated mock test count for user ${req.user.email}: ${req.user.mockTestsUsed + 1}/${req.user.mockTestLimit}`);
     }
 
     // Verify the types of questions returned match the requested types
@@ -577,10 +483,6 @@ router.post('/random', async (req, res) => {
         console.log(`Warning: Requested question types missing from quiz: ${missingTypes.join(', ')}`);
       }
     }
-
-    console.log(`Created quiz with ${transformedQuestions.length} questions.`);
-    console.log(`Question type distribution: ${JSON.stringify(questionCounts)}`);
-    console.log('----------------------------------------------');
     
     res.json({
       quizId,
@@ -593,8 +495,8 @@ router.post('/random', async (req, res) => {
   }
 });
 
-// Get a question by ID
-router.get('/:id', async (req, res) => {
+// Get a question by ID - Paid users only
+router.get('/:id', authenticateToken, requirePaidUser, async (req: AuthRequest, res) => {
   try {
     const question = await QuestionBagV2.findById(req.params.id);
     if (!question) {
@@ -611,28 +513,33 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update a question by ID
-router.put('/:id', async (req, res) => {
+// Update a question - Admin only
+router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params;
+    // Only admin can update questions
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin access required to update questions' 
+      });
+    }
+    
+    const questionId = req.params.id;
     const updateData = req.body;
     
-    console.log(`Updating question ${id} with data:`, updateData);
+    console.log(`Admin ${req.user.email} updating question ${questionId}`);
     
-    const question = await QuestionBagV2.findById(id);
+    const updatedQuestion = await QuestionBagV2.findByIdAndUpdate(
+      questionId,
+      updateData,
+      { new: true, runValidators: true }
+    );
     
-    if (!question) {
+    if (!updatedQuestion) {
       return res.status(404).json({ message: 'Question not found' });
     }
     
-    // Update the question
-    const updatedQuestion = await QuestionBagV2.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
-    
-    // Transform the question for frontend
+    // Transform question for frontend
     const transformedQuestion = transformQuestionForFrontend(updatedQuestion);
     
     console.log('Question updated successfully');
@@ -643,21 +550,26 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete a question by ID
-router.delete('/:id', async (req, res) => {
+// Delete a question - Admin only
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params;
-    
-    console.log(`Deleting question ${id}`);
-    
-    const question = await QuestionBagV2.findById(id);
-    
-    if (!question) {
-      return res.status(404).json({ message: 'Question not found' });
+    // Only admin can delete questions
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin access required to delete questions' 
+      });
     }
     
-    // Delete the question
-    await QuestionBagV2.findByIdAndDelete(id);
+    const questionId = req.params.id;
+    
+    console.log(`Admin ${req.user.email} deleting question ${questionId}`);
+    
+    const deletedQuestion = await QuestionBagV2.findByIdAndDelete(questionId);
+    
+    if (!deletedQuestion) {
+      return res.status(404).json({ message: 'Question not found' });
+    }
     
     console.log('Question deleted successfully');
     res.json({ message: 'Question deleted successfully' });
@@ -667,11 +579,20 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Create a new question
-router.post('/', async (req, res) => {
+// Create a new question - Admin only
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    // Only admin can create questions
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin access required to create questions' 
+      });
+    }
+    
     const questionData = req.body;
     
+    console.log(`Admin ${req.user.email} creating new question`);
     console.log('Creating new question with data:', JSON.stringify(questionData, null, 2));
     
     // Create the question

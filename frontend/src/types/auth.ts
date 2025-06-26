@@ -1,3 +1,19 @@
+export type UserRole = 'guest' | 'registered' | 'monthly_pack' | 'quarterly_pack' | 'annual_pack' | 'admin';
+export type SubscriptionPlan = 'free_mock' | 'monthly_pack' | 'quarterly_pack' | 'annual_pack';
+
+export interface ResetInfo {
+  hasUsedReset: boolean;
+  resetDate?: Date;
+  resetCount: number;
+}
+
+export interface PlanInfo {
+  plan: SubscriptionPlan;
+  startDate: Date;
+  endDate?: Date;
+  isActive: boolean;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -5,6 +21,12 @@ export interface User {
   targetScore: number;
   createdAt: string;
   phoneNumber?: string;
+  role: UserRole;
+  subscriptionPlan: SubscriptionPlan;
+  planInfo: PlanInfo;
+  mockTestsUsed: number;
+  mockTestLimit: number;
+  resetInfo: ResetInfo;
 }
 
 export interface LoginCredentials {
@@ -16,6 +38,7 @@ export interface RegisterCredentials extends LoginCredentials {
   fullName: string;
   targetScore: number;
   phoneNumber?: string;
+  subscriptionPlan?: SubscriptionPlan;
 }
 
 export interface AuthResponse {
@@ -24,7 +47,6 @@ export interface AuthResponse {
   expiresIn?: string;
 }
 
-// Interface for user performance statistics
 export interface UserStats {
   totalQuizzes: number;
   averageScore: number;
@@ -36,8 +58,7 @@ export interface UserStats {
   }>;
 }
 
-// Expanded user profile with performance stats
 export interface UserProfile {
   user: User;
   stats: UserStats;
-} 
+}

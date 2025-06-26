@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { User, IUser } from '../models/User';
 import { UserQuiz } from '../models/UserQuiz';
 import { RefreshToken } from '../models/RefreshToken';
-import { authMiddleware, AuthRequest } from '../middleware/authMiddleware';
+import { authenticateToken, AuthRequest } from '../middleware/roleAuth';
 
 const router = express.Router();
 
@@ -23,8 +23,8 @@ const generateTokens = async (userId: string, deviceInfo?: string) => {
   // Create access token
   const accessToken = jwt.sign(
     { userId },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRY }
+    JWT_SECRET as string,
+    { expiresIn: JWT_EXPIRY as string }
   );
 
   // Create refresh token
@@ -54,7 +54,7 @@ const generateTokens = async (userId: string, deviceInfo?: string) => {
 // Register a new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, fullName, targetScore, phoneNumber } = req.body;
+    const { email, password, fullName, targetScore, phoneNumber, subscriptionPlan } = req.body;
     const deviceInfo = req.headers['user-agent'] || '';
 
     // Check if user already exists
@@ -63,11 +63,42 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Determine role and limits based on subscription plan
+    let role = 'registered';
+    let mockTestLimit = 2;
+    let planEndDate;
+
+    if (subscriptionPlan === 'monthly_pack') {
+      role = 'monthly_pack';
+      mockTestLimit = -1; // Unlimited
+      planEndDate = new Date();
+      planEndDate.setMonth(planEndDate.getMonth() + 1);
+    } else if (subscriptionPlan === 'quarterly_pack') {
+      role = 'quarterly_pack';
+      mockTestLimit = -1; // Unlimited
+      planEndDate = new Date();
+      planEndDate.setMonth(planEndDate.getMonth() + 3);
+    } else if (subscriptionPlan === 'annual_pack') {
+      role = 'annual_pack';
+      mockTestLimit = -1; // Unlimited
+      planEndDate = new Date();
+      planEndDate.setFullYear(planEndDate.getFullYear() + 1);
+    }
+
     // Create new user
     const user = new User({
       email,
       password,
       fullName,
+      role,
+      subscriptionPlan: subscriptionPlan || 'free_mock',
+      planInfo: {
+        plan: subscriptionPlan || 'free_mock',
+        startDate: new Date(),
+        endDate: planEndDate,
+        isActive: true,
+      },
+      mockTestLimit,
       ...(targetScore && { targetScore }),
       ...(phoneNumber && { phoneNumber }),
     });
@@ -87,6 +118,12 @@ router.post('/register', async (req, res) => {
       fullName: user.fullName,
       targetScore: user.targetScore,
       phoneNumber: user.phoneNumber,
+      role: user.role,
+      subscriptionPlan: user.subscriptionPlan,
+      planInfo: user.planInfo,
+      mockTestsUsed: user.mockTestsUsed,
+      mockTestLimit: user.mockTestLimit,
+      resetInfo: user.resetInfo,
       createdAt: user.createdAt,
     };
 
@@ -145,6 +182,12 @@ router.post('/login', async (req, res) => {
       fullName: user.fullName,
       targetScore: user.targetScore,
       phoneNumber: user.phoneNumber,
+      role: user.role,
+      subscriptionPlan: user.subscriptionPlan,
+      planInfo: user.planInfo,
+      mockTestsUsed: user.mockTestsUsed,
+      mockTestLimit: user.mockTestLimit,
+      resetInfo: user.resetInfo,
       createdAt: user.createdAt,
     };
 
@@ -236,7 +279,7 @@ router.post('/refresh-token', async (req, res) => {
 });
 
 // Logout endpoint - revoke the refresh token
-router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/logout', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const refreshTokenString = req.cookies.refreshToken || req.body.refreshToken;
     
@@ -265,7 +308,7 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Get user profile with quiz performance
-router.get('/profile', authMiddleware, async (req: AuthRequest, res) => {
+router.get('/profile', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     
@@ -291,7 +334,7 @@ router.get('/profile', authMiddleware, async (req: AuthRequest, res) => {
     console.log('Total quizzes:', totalQuizzes);
     console.log('Average score:', averageScore);
     
-    // Return profile data
+    // Return complete profile data including role-based information
     res.json({
       user: {
         _id: user._id,
@@ -299,6 +342,12 @@ router.get('/profile', authMiddleware, async (req: AuthRequest, res) => {
         fullName: user.fullName,
         targetScore: user.targetScore,
         phoneNumber: user.phoneNumber,
+        role: user.role,
+        subscriptionPlan: user.subscriptionPlan,
+        planInfo: user.planInfo,
+        mockTestsUsed: user.mockTestsUsed,
+        mockTestLimit: user.mockTestLimit,
+        resetInfo: user.resetInfo,
         createdAt: user.createdAt,
       },
       stats: {

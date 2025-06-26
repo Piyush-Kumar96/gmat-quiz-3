@@ -1,0 +1,86 @@
+import express from 'express';
+import { UserQuestionHistoryService } from '../services/userQuestionHistoryService';
+import { authenticateToken, requirePaidUser, AuthenticatedRequest } from '../middleware/roleAuth';
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get user's question history stats
+router.get('/stats', async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const stats = await UserQuestionHistoryService.getUserQuestionStats(req.user.id);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching question history stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get user's reset information
+router.get('/reset-info', async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const resetInfo = await UserQuestionHistoryService.getUserResetInfo(req.user.id);
+    res.json(resetInfo);
+  } catch (error) {
+    console.error('Error fetching reset info:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Reset user's question history (paid users only)
+router.post('/reset', requirePaidUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const result = await UserQuestionHistoryService.resetUserQuestionHistory(req.user.id);
+    
+    if (result.success) {
+      res.json({ message: result.message });
+    } else {
+      res.status(400).json({ message: result.message });
+    }
+  } catch (error) {
+    console.error('Error resetting question history:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Record question interaction (internal endpoint)
+router.post('/record', async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { questionId, action = 'viewed' } = req.body;
+    
+    if (!questionId) {
+      return res.status(400).json({ message: 'Question ID is required' });
+    }
+
+    await UserQuestionHistoryService.recordQuestionInteraction(
+      req.user.id,
+      questionId,
+      action
+    );
+
+    res.json({ message: 'Question interaction recorded' });
+  } catch (error) {
+    console.error('Error recording question interaction:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+export default router; 

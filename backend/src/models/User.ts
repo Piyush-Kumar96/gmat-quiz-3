@@ -1,12 +1,34 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export type UserRole = 'guest' | 'registered' | 'monthly_pack' | 'quarterly_pack' | 'annual_pack' | 'admin';
+export type SubscriptionPlan = 'free_mock' | 'monthly_pack' | 'quarterly_pack' | 'annual_pack';
+
+export interface ResetInfo {
+  hasUsedReset: boolean;
+  resetDate?: Date;
+  resetCount: number;
+}
+
+export interface PlanInfo {
+  plan: SubscriptionPlan;
+  startDate: Date;
+  endDate?: Date;
+  isActive: boolean;
+}
+
 export interface IUser extends mongoose.Document {
   email: string;
   password: string;
   fullName: string;
   targetScore?: number;
   phoneNumber?: string;
+  role: UserRole;
+  subscriptionPlan: SubscriptionPlan;
+  planInfo: PlanInfo;
+  mockTestsUsed: number;
+  mockTestLimit: number;
+  resetInfo: ResetInfo;
   createdAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
@@ -38,6 +60,55 @@ const userSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     trim: true,
+  },
+  role: {
+    type: String,
+    enum: ['guest', 'registered', 'monthly_pack', 'quarterly_pack', 'annual_pack', 'admin'],
+    default: 'registered',
+  },
+  subscriptionPlan: {
+    type: String,
+    enum: ['free_mock', 'monthly_pack', 'quarterly_pack', 'annual_pack'],
+    default: 'free_mock',
+  },
+  planInfo: {
+    plan: {
+      type: String,
+      enum: ['free_mock', 'monthly_pack', 'quarterly_pack', 'annual_pack'],
+      default: 'free_mock',
+    },
+    startDate: {
+      type: Date,
+      default: Date.now,
+    },
+    endDate: {
+      type: Date,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  mockTestsUsed: {
+    type: Number,
+    default: 0,
+  },
+  mockTestLimit: {
+    type: Number,
+    default: 2, // Default limit for registered users
+  },
+  resetInfo: {
+    hasUsedReset: {
+      type: Boolean,
+      default: false,
+    },
+    resetDate: {
+      type: Date,
+    },
+    resetCount: {
+      type: Number,
+      default: 0,
+    },
   },
   createdAt: {
     type: Date,

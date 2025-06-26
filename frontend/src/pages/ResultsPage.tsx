@@ -61,7 +61,7 @@ export const ResultsPage: React.FC = () => {
         <Paragraph>
           There was an issue retrieving your quiz results. This might happen if you accessed this page directly.
         </Paragraph>
-        <Button type="primary" onClick={() => navigate('/')} className="mt-4">
+        <Button type="primary" onClick={() => navigate('/config')} className="mt-4">
           Start New Quiz
         </Button>
       </div>
@@ -206,7 +206,7 @@ export const ResultsPage: React.FC = () => {
       </div>
 
       <div className="mt-8 flex justify-center">
-        <Button type="primary" size="large" onClick={() => navigate('/')} className="mr-4">
+        <Button type="primary" size="large" onClick={() => navigate('/config')} className="mr-4">
           Start New Quiz
         </Button>
         <Button onClick={() => window.print()}>Print Results</Button>
