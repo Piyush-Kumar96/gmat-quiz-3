@@ -23,8 +23,8 @@ const generateTokens = async (userId: string, deviceInfo?: string) => {
   // Create access token
   const accessToken = jwt.sign(
     { userId },
-    JWT_SECRET as string,
-    { expiresIn: JWT_EXPIRY as string }
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRY }
   );
 
   // Create refresh token

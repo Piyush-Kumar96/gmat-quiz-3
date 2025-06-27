@@ -62,7 +62,7 @@ export const ConfigPage: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [sectionOrder, setSectionOrder] = useState<GMATSection[]>(['Quantitative Reasoning', 'Verbal Reasoning', 'Data Insights']);
-  const [breakAfterSection, setBreakAfterSection] = useState(0);
+  const [breakAfterSection, setBreakAfterSection] = useState(1);
   const redirectMessage = location.state?.message;
 
   const availableSections: GMATSection[] = ['Quantitative Reasoning', 'Verbal Reasoning', 'Data Insights'];
@@ -186,63 +186,21 @@ export const ConfigPage: React.FC = () => {
     
     setLoading(true);
     
-    // For now, start with the first section in the order
-    const firstSection = sectionOrder[0];
-    let sectionConfig;
+    // Create GMAT Focus configuration
+    const gmatFocusConfig = {
+      isGmatFocus: true,
+      sectionOrder,
+      breakAfterSection,
+      isMockTest: true,
+      // Add basic config properties
+      count: 64, // Total questions across all sections
+      timeLimit: 135, // Total time in minutes
+      questionTypeMode: 'balanced' as const,
+      difficultyMode: 'mixed' as const,
+      categoryMode: 'mixed' as const
+    };
     
-    if (firstSection === 'Quantitative Reasoning') {
-      sectionConfig = {
-        count: 21,
-        timeLimit: 45,
-        questionTypeMode: 'specific',
-        selectedQuestionTypes: ['Problem Solving'],
-        difficultyMode: 'mixed',
-        categoryMode: 'specific',
-        selectedCategories: ['Quantitative Reasoning'],
-        isGmatFocus: true,
-        sectionOrder,
-        breakAfterSection,
-        currentSection: 0,
-        totalSections: 3,
-        isMockTest: true,
-        sectionName: 'GMAT Focus: Quantitative Reasoning'
-      };
-    } else if (firstSection === 'Verbal Reasoning') {
-      sectionConfig = {
-        count: 23,
-        timeLimit: 45,
-        questionTypeMode: 'specific',
-        selectedQuestionTypes: ['Reading Comprehension', 'Critical Reasoning'],
-        difficultyMode: 'mixed',
-        categoryMode: 'specific',
-        selectedCategories: ['Verbal Reasoning'],
-        isGmatFocus: true,
-        sectionOrder,
-        breakAfterSection,
-        currentSection: 0,
-        totalSections: 3,
-        isMockTest: true,
-        sectionName: 'GMAT Focus: Verbal Reasoning'
-      };
-    } else { // Data Insights
-      sectionConfig = {
-        count: 20,
-        timeLimit: 45,
-        questionTypeMode: 'specific',
-        selectedQuestionTypes: ['Data Sufficiency'],
-        difficultyMode: 'mixed',
-        categoryMode: 'mixed', // Allow all categories for data insights
-        isGmatFocus: true,
-        sectionOrder,
-        breakAfterSection,
-        currentSection: 0,
-        totalSections: 3,
-        isMockTest: true,
-        sectionName: 'GMAT Focus: Data Insights'
-      };
-    }
-    
-    navigate('/quiz', { state: { config: sectionConfig }});
+    navigate('/gmat-focus-quiz', { state: { config: gmatFocusConfig }});
   };
 
   // Show feature lock for guests
@@ -327,170 +285,136 @@ export const ConfigPage: React.FC = () => {
               {canAccessFeature('mock_test') ? (
                 <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 border border-purple-200">
                   {/* Header */}
-                  <div className="text-center mb-8">
+                  <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                       <RocketOutlined className="text-3xl text-white" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
                     </div>
-                    <Title level={2} className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                    <Title level={2} className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
                       GMAT Focus Edition
                     </Title>
-                    <Text className="text-lg text-gray-600 mb-2">
-                      Official 3-section format • Complete testing experience
-                    </Text>
-                    <Text className="text-sm text-gray-500">
-                      64 questions across Quantitative (21q), Verbal (23q), and Data Insights (20q) • 2h 15m total
+                    <Text className="text-base text-gray-600 mb-3">
+                      Official Format 3-section test • 64 questions • 135 minutes total
                     </Text>
                   </div>
 
-                  {/* Section Order Selection */}
+                  {/* Section Order Selection - Compact Design */}
                   <div className="mb-6">
                     <div className="flex items-center mb-4">
                       <SwapOutlined className="mr-2 text-purple-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                      <Text className="font-semibold text-gray-800">Choose your section order</Text>
+                      <Text className="font-semibold text-gray-800">Choose section order</Text>
                     </div>
                     
-                    <div className="space-y-4">
-                      {[1, 2, 3].map((position) => (
-                        <div key={position} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-bold text-white">{position}</span>
-                            </div>
-                            <div className="flex-1">
-                              <Text className="text-sm text-gray-600 mb-2">
-                                {position === 1 ? 'First Section' : position === 2 ? 'Second Section' : 'Third Section'}
-                              </Text>
-                              <Select
-                                placeholder="Choose section"
-                                className="w-full"
-                                size="large"
-                                value={sectionOrder[position - 1]}
-                                onChange={(value) => {
-                                  const newOrder = [...sectionOrder];
-                                  newOrder[position - 1] = value;
-                                  setSectionOrder(newOrder);
-                                }}
-                                dropdownStyle={{ zIndex: 1050 }}
-                              >
-                                {availableSections
-                                  .filter(section => !sectionOrder.includes(section) || section === sectionOrder[position - 1])
-                                  .map(section => (
-                                  <Option key={section} value={section}>
-                                    <div className="flex items-center py-2">
-                                      {section === 'Quantitative Reasoning' && (
-                                        <>
-                                          <CalculatorOutlined className="mr-3 text-blue-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                                          <div>
-                                            <div className="font-semibold text-gray-800">Quantitative Reasoning</div>
-                                            <div className="text-xs text-gray-500">21 questions • 45 minutes • Problem Solving</div>
-                                          </div>
-                                        </>
-                                      )}
-                                      {section === 'Verbal Reasoning' && (
-                                        <>
-                                          <FileTextOutlined className="mr-3 text-green-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                                          <div>
-                                            <div className="font-semibold text-gray-800">Verbal Reasoning</div>
-                                            <div className="text-xs text-gray-500">23 questions • 45 minutes • Reading & Critical Reasoning</div>
-                                          </div>
-                                        </>
-                                      )}
-                                      {section === 'Data Insights' && (
-                                        <>
-                                          <BarChartOutlined className="mr-3 text-orange-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                                          <div>
-                                            <div className="font-semibold text-gray-800">Data Insights</div>
-                                            <div className="text-xs text-gray-500">20 questions • 45 minutes • Data Sufficiency & Analysis</div>
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  </Option>
+                    <div className="space-y-3">
+                      {availableSections.map((section, index) => {
+                        const currentPosition = sectionOrder.indexOf(section) + 1;
+                        return (
+                          <div key={section} className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                {section === 'Quantitative Reasoning' && (
+                                  <CalculatorOutlined className="text-blue-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                )}
+                                {section === 'Verbal Reasoning' && (
+                                  <FileTextOutlined className="text-green-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                )}
+                                {section === 'Data Insights' && (
+                                  <BarChartOutlined className="text-orange-500 text-lg" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                                )}
+                                <div>
+                                  <div className="font-semibold text-gray-800 text-sm">{section}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {section === 'Quantitative Reasoning' && '21 questions • 45 min'}
+                                    {section === 'Verbal Reasoning' && '23 questions • 45 min'}
+                                    {section === 'Data Insights' && '20 questions • 45 min'}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Clickable Number Circles */}
+                              <div className="flex space-x-2">
+                                {[1, 2, 3].map((position) => (
+                                  <button
+                                    key={position}
+                                    onClick={() => {
+                                      const newOrder = [...sectionOrder];
+                                      // Find current position of this section
+                                      const currentIndex = newOrder.indexOf(section);
+                                      // Find what's currently at the target position
+                                      const targetSection = newOrder[position - 1];
+                                      
+                                      // Swap positions
+                                      newOrder[currentIndex] = targetSection;
+                                      newOrder[position - 1] = section;
+                                      setSectionOrder(newOrder);
+                                    }}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${
+                                      currentPosition === position
+                                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md'
+                                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                    }`}
+                                  >
+                                    {position}
+                                  </button>
                                 ))}
-                              </Select>
+                              </div>
                             </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Break Configuration - Compact */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100 mb-6">
+                    <div className="flex items-center mb-4">
+                      <CoffeeOutlined className="mr-2 text-orange-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
+                      <Text className="font-semibold text-gray-800 text-sm">Optional 10-minute break</Text>
+                    </div>
+                    
+                    <div className="flex justify-between items-center space-x-4">
+                      {[
+                        { value: 1, label: 'After 1st section', icon: <CoffeeOutlined className="text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} /> },
+                        { value: 2, label: 'After 2nd section', icon: <CoffeeOutlined className="text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} /> },
+                        { value: 0, label: 'No break', icon: <ClockCircleOutlined className="text-gray-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} /> }
+                      ].map((option) => (
+                        <div key={option.value} className="flex flex-col items-center space-y-2 flex-1">
+                          <button
+                            onClick={() => setBreakAfterSection(option.value)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+                              breakAfterSection === option.value
+                                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md'
+                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
+                          >
+                            ✓
+                          </button>
+                          <div className="text-center">
+                            <div className="flex justify-center mb-1">
+                              {option.icon}
+                            </div>
+                            <Text className="text-xs text-gray-700">{option.label}</Text>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Break Configuration - Right after section order */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 mb-6">
-                    <div className="flex items-center mb-3">
-                      <CoffeeOutlined className="mr-2 text-orange-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                      <Text className="font-semibold text-gray-800">Optional 10-minute break</Text>
-                    </div>
-                    <Select
-                      className="w-full"
-                      size="large"
-                      value={breakAfterSection}
-                      onChange={setBreakAfterSection}
-                      placeholder="Choose when to take your break"
-                    >
-                      <Option value={0}>
-                        <div className="flex items-center py-1">
-                          <ClockCircleOutlined className="mr-3 text-gray-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                          <div>
-                            <div className="font-medium text-gray-800">No break</div>
-                            <div className="text-xs text-gray-500">Complete all sections continuously</div>
-                          </div>
-                        </div>
-                      </Option>
-                      <Option value={1}>
-                        <div className="flex items-center py-1">
-                          <CoffeeOutlined className="mr-3 text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                          <div>
-                            <div className="font-medium text-gray-800">After 1st section</div>
-                            <div className="text-xs text-gray-500">Take break after completing your first section</div>
-                          </div>
-                        </div>
-                      </Option>
-                      <Option value={2}>
-                        <div className="flex items-center py-1">
-                          <CoffeeOutlined className="mr-3 text-blue-500" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                          <div>
-                            <div className="font-medium text-gray-800">After 2nd section</div>
-                            <div className="text-xs text-gray-500">Take break after completing your second section</div>
-                          </div>
-                        </div>
-                      </Option>
-                    </Select>
-                    
-                    <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                      <Text className="text-xs text-blue-700 flex items-center">
-                        <span className="mr-1">💡</span>
-                        You can end your break early and continue whenever you're ready
-                      </Text>
-                    </div>
-                  </div>
-
-                  {/* CTA Button */}
+                  {/* Start Button */}
                   <div className="text-center">
                     <Button
                       type="primary"
                       size="large"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 border-none text-white font-semibold px-12 py-3 h-auto rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                       onClick={() => handleGMATFocusMockTest(sectionOrder, breakAfterSection)}
-                      disabled={loading || sectionOrder.length !== 3 || sectionOrder.includes(undefined as any)}
-                      className="w-full h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
-                      style={{ color: 'white' }}
+                      loading={loading}
                     >
-                      {loading ? (
-                        <span className="flex items-center justify-center text-white">
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
-                          Starting GMAT Focus Edition...
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center text-white">
-                          <PlayCircleOutlined className="mr-3 text-xl" onPointerEnterCapture={() => {}} onPointerLeaveCapture={() => {}} />
-                          Start GMAT Focus Edition Test
-                        </span>
-                      )}
+                      Start GMAT Focus Test
                     </Button>
-                    
-                    <Text className="block mt-3 text-sm text-gray-500">
-                      Complete authentic GMAT Focus experience with customizable section order
-                    </Text>
+                    <div className="mt-3">
+                      <Text className="text-xs text-gray-500">
+                        Once you start, section order and break options are locked in.
+                      </Text>
+                    </div>
                   </div>
                 </div>
               ) : (
