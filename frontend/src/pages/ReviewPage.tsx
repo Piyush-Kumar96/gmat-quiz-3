@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getQuestionBagV2, deleteQuestionBagItem, updateQuestionBagV2, createQuestionBagItem } from '../services/api';
 import { Question } from '../types/quiz';
-import { Button, Card, Typography, Space, Tag, Pagination, Collapse, message, Form, Input, Radio, Tooltip, Modal, Select, Divider, Switch } from 'antd';
-import { DeleteOutlined, EditOutlined, SaveOutlined, CloseOutlined, LinkOutlined, PlusOutlined, FileAddOutlined } from '@ant-design/icons';
+import { Button, Card, Typography, Space, Tag, Pagination, Collapse, message, Form, Input, Radio, Tooltip, Modal, Select, Divider, Switch, Alert, Result } from 'antd';
+import { DeleteOutlined, EditOutlined, SaveOutlined, CloseOutlined, LinkOutlined, PlusOutlined, FileAddOutlined, LockOutlined, UserOutlined, FileTextOutlined } from '@ant-design/icons';
 import QuestionCard from '../components/QuestionCard';
+import { useRoleAccess } from '../hooks/useRoleAccess';
 
 const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -110,6 +111,9 @@ interface NewQuestion {
 }
 
 const ReviewPage: React.FC = () => {
+  const { isAdmin } = useRoleAccess();
+  
+  // All hooks must be called before any conditional returns
   const [queryParams, setQueryParams] = useState<QueryParams>({
     page: 1,
     limit: 10,
@@ -140,6 +144,108 @@ const ReviewPage: React.FC = () => {
     queryKey: ['questions', queryParams],
     queryFn: () => getQuestionBagV2(queryParams)
   });
+
+  // If user is not admin, show improved access denied message
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="container mx-auto px-4 max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <Title level={2} className="text-gray-800">Question Management System</Title>
+          </div>
+
+          {/* Restricted Access Box */}
+          <div className="bg-gray-100 border border-gray-300 rounded-xl shadow-lg p-8">
+            <div className="text-center">
+              {/* Lock Icon */}
+              <div className="mb-6">
+                <LockOutlined 
+                  className="text-6xl text-gray-500" 
+                  onPointerEnterCapture={undefined} 
+                  onPointerLeaveCapture={undefined} 
+                />
+              </div>
+
+              {/* Main Message */}
+              <Title level={3} className="text-gray-700 mb-4">
+                Access Restricted
+              </Title>
+              <Text className="text-lg text-gray-600 block mb-6">
+                Question Bank access is restricted to administrators only.
+              </Text>
+
+              {/* Admin Info Alert */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start">
+                  <UserOutlined 
+                    className="text-blue-500 mt-1 mr-3 text-lg" 
+                    onPointerEnterCapture={undefined} 
+                    onPointerLeaveCapture={undefined} 
+                  />
+                  <div className="text-left">
+                    <Text strong className="text-blue-800 block mb-2">
+                      Admin Only Feature
+                    </Text>
+                    <Text className="text-blue-700 text-sm">
+                      This section allows administrators to manage the question database, including adding, editing, and reviewing questions. Regular users will have access to a personalized review section in the future.
+                    </Text>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coming Soon Section */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start">
+                  <FileTextOutlined 
+                    className="text-green-500 mt-1 mr-3 text-lg" 
+                    onPointerEnterCapture={undefined} 
+                    onPointerLeaveCapture={undefined} 
+                  />
+                  <div className="text-left">
+                    <Text strong className="text-green-800 block mb-2">
+                      Coming Soon: Personal Review Section
+                    </Text>
+                    <Text className="text-green-700 text-sm block mb-3">
+                      We're working on a personalized review area where you'll be able to:
+                    </Text>
+                    <ul className="text-sm text-green-700 space-y-1 text-left">
+                      <li className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                        Review all questions you've attempted
+                      </li>
+                      <li className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                        Revisit your mistakes and learn from them
+                      </li>
+                      <li className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                        Track your progress over time
+                      </li>
+                      <li className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
+                        Focus on areas that need improvement
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <Button 
+                type="primary" 
+                size="large"
+                onClick={() => window.history.back()}
+                className="bg-gray-600 hover:bg-gray-700 border-gray-600 hover:border-gray-700 px-8 py-2 h-auto rounded-xl text-white hover:text-white"
+              >
+                Go Back
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const toggleAnswer = (questionId: string) => {
     setVisibleAnswers(prev => ({
@@ -642,7 +748,7 @@ const ReviewPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-center mb-6">
-          <Title level={2}>Question Review</Title>
+          <Title level={2}>Question Bank</Title>
           <div className="flex items-center space-x-4">
             <Button
               type="primary"

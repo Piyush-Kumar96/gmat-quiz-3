@@ -75,7 +75,7 @@ const GMATFocusQuizPage: React.FC = () => {
       timeLimit: 45,
       questionTypes: ['Problem Solving'],
       categories: ['Quantitative Reasoning'],
-      icon: <CalculatorOutlined />,
+      icon: <CalculatorOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />,
       color: '#1890ff'
     },
     {
@@ -84,7 +84,7 @@ const GMATFocusQuizPage: React.FC = () => {
       timeLimit: 45,
       questionTypes: ['Reading Comprehension', 'Critical Reasoning'],
       categories: ['Verbal Reasoning'],
-      icon: <FileTextOutlined />,
+      icon: <FileTextOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />,
       color: '#52c41a'
     },
     {
@@ -93,7 +93,7 @@ const GMATFocusQuizPage: React.FC = () => {
       timeLimit: 45,
       questionTypes: ['Data Sufficiency'],
       categories: ['Data Insights'],
-      icon: <BarChartOutlined />,
+      icon: <BarChartOutlined onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} />,
       color: '#722ed1'
     }
   ];
@@ -351,7 +351,11 @@ const GMATFocusQuizPage: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <Card className="max-w-2xl w-full mx-4">
           <div className="text-center">
-            <CoffeeOutlined className="text-6xl text-orange-500 mb-4" />
+            <CoffeeOutlined 
+              className="text-6xl text-orange-500 mb-4" 
+              onPointerEnterCapture={undefined} 
+              onPointerLeaveCapture={undefined} 
+            />
             <Title level={2} className="mb-4">Break Time</Title>
             <Text className="text-lg text-gray-600 block mb-6">
               You've completed Section {gmatState.currentSection + 1}. Take a well-deserved break!
@@ -445,7 +449,11 @@ const GMATFocusQuizPage: React.FC = () => {
           <div className="flex justify-between items-center mb-3">
             <div>
               <h2 className="text-lg font-bold text-purple-800 flex items-center">
-                <RocketOutlined className="mr-2" />
+                <RocketOutlined 
+                  className="mr-2" 
+                  onPointerEnterCapture={undefined} 
+                  onPointerLeaveCapture={undefined} 
+                />
                 GMAT Focus Edition Mock Test
               </h2>
               <p className="text-sm text-purple-600">
@@ -476,7 +484,14 @@ const GMATFocusQuizPage: React.FC = () => {
                   }`}
                 >
                   <div className="text-lg mb-1">
-                    {isCompleted ? <CheckCircleOutlined /> : sectionConfig?.icon}
+                    {isCompleted ? (
+                      <CheckCircleOutlined 
+                        onPointerEnterCapture={undefined} 
+                        onPointerLeaveCapture={undefined} 
+                      />
+                    ) : (
+                      sectionConfig?.icon
+                    )}
                   </div>
                   <div className="text-xs font-medium">{sectionName}</div>
                 </div>
@@ -501,7 +516,10 @@ const GMATFocusQuizPage: React.FC = () => {
           
           <div className="flex items-center space-x-4">
             <div className={`flex items-center space-x-2 ${timeLeft < 300 ? 'text-red-600' : 'text-gray-700'}`}>
-              <ClockCircleOutlined />
+              <ClockCircleOutlined 
+                onPointerEnterCapture={undefined} 
+                onPointerLeaveCapture={undefined} 
+              />
               <span className="font-mono text-lg font-semibold">
                 {formatTime(timeLeft)}
               </span>
@@ -509,7 +527,17 @@ const GMATFocusQuizPage: React.FC = () => {
             
             <Button
               type="default"
-              icon={isPaused ? <PlayCircleOutlined /> : <PauseCircleOutlined />}
+              icon={isPaused ? (
+                <PlayCircleOutlined 
+                  onPointerEnterCapture={undefined} 
+                  onPointerLeaveCapture={undefined} 
+                />
+              ) : (
+                <PauseCircleOutlined 
+                  onPointerEnterCapture={undefined} 
+                  onPointerLeaveCapture={undefined} 
+                />
+              )}
               onClick={() => setIsPaused(!isPaused)}
               disabled={isSubmitting}
             >

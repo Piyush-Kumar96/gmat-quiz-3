@@ -94,7 +94,7 @@ export const Navbar: React.FC = () => {
                 to="/review"
                 className={getLinkClasses('/review')}
               >
-                Review
+                Question Bank
               </Link>
               <Link
                 to="/import"
@@ -185,7 +185,7 @@ export const Navbar: React.FC = () => {
             to="/review"
             className={getMobileLinkClasses('/review')}
           >
-            Review
+            Question Bank
           </Link>
           <Link
             to="/import"

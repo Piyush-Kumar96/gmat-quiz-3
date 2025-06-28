@@ -38,15 +38,15 @@ export const HomePage: React.FC = () => {
 
           {/* Review Questions Option */}
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border-t-4 border-purple-500">
-            <h2 className="text-xl font-semibold mb-4 text-purple-700">Review Questions</h2>
+            <h2 className="text-xl font-semibold mb-4 text-purple-700">Question Bank</h2>
             <p className="text-gray-600 mb-6">
-              Admin access to review, add, or edit existing questions in the question bank. Manage the content for quizzes.
+              Administrative access to manage the question database. Review, add, edit, and organize questions for the quiz platform. (Admin Only)
             </p>
             <button
               onClick={() => navigate('/review')}
               className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
             >
-              Review Questions
+              Access Question Bank
             </button>
           </div>
 
